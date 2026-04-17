@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const cors = require('cors');
 
 const routes = require('./infra/http/routes');
@@ -37,6 +38,7 @@ app.set('trust proxy', env.trustProxy);
 
 app.use(express.json({ limit: env.jsonBodyLimit }));
 app.use(cors(buildCorsOptions()));
+app.use('/uploads', express.static(path.resolve(__dirname, '../..', 'uploads')));
 
 app.get('/health', (_request, response) => {
   response.status(200).json({
