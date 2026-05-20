@@ -5,7 +5,7 @@ class CreateDashboardImageUseCase {
     this.dashboardImageRepository = dashboardImageRepository;
   }
 
-  async execute({ imageUrl, createdBy }) {
+  async execute({ imageUrl, createdBy, storageId, resourceType }) {
     const normalizedUrl = imageUrl?.trim();
 
     if (!normalizedUrl) {
@@ -15,6 +15,8 @@ class CreateDashboardImageUseCase {
     return this.dashboardImageRepository.create({
       imageUrl: normalizedUrl,
       createdBy,
+      storageId,
+      resourceType,
     });
   }
 }

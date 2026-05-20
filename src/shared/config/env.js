@@ -1,4 +1,10 @@
-const REQUIRED_ENV_VARS = ['MONGO_URI', 'JWT_SECRET'];
+const REQUIRED_ENV_VARS = [
+  'MONGO_URI',
+  'JWT_SECRET',
+  'CLOUDINARY_CLOUD_NAME',
+  'CLOUDINARY_API_KEY',
+  'CLOUDINARY_API_SECRET',
+];
 
 function readRequiredEnv(name) {
   const value = process.env[name];
@@ -36,6 +42,9 @@ const env = {
   corsOrigins: parseCorsOrigins(process.env.CORS_ORIGINS),
   trustProxy: process.env.TRUST_PROXY?.trim() || 'loopback',
   jsonBodyLimit: process.env.JSON_BODY_LIMIT?.trim() || '1mb',
+  cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME?.trim() || '',
+  cloudinaryApiKey: process.env.CLOUDINARY_API_KEY?.trim() || '',
+  cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET?.trim() || '',
 };
 
 module.exports = {
