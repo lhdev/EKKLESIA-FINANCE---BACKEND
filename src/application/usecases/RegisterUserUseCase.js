@@ -1,13 +1,13 @@
 const bcrypt = require("bcryptjs");
 const AppError = require("../../shared/errors/AppError");
-const { normalizeRole } = require("../../shared/config/roles");
+const { ROLES } = require("../../shared/config/roles");
 
 class RegisterUserUseCase {
   constructor(userRepository) {
     this.userRepository = userRepository;
   }
 
-  async execute({ name, email, church, password, role }) {
+  async execute({ name, email, church, password }) {
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedChurch = typeof church === "string" ? church.trim() : church;
 
@@ -26,7 +26,8 @@ class RegisterUserUseCase {
       email: normalizedEmail,
       church: normalizedChurch,
       password: hash,
-      role: normalizeRole(role),
+      // Perfis privilegiados so podem ser atribuidos pela rota autenticada de usuarios.
+      role: ROLES.MEMBRO,
     });
   }
 }

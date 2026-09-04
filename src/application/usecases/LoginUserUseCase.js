@@ -32,9 +32,24 @@ class LoginUserUseCase {
       throw new AppError("Credenciais invalidas", 401);
     }
 
+    if (
+      user.church &&
+      normalizedChurch &&
+      user.church.trim().toLowerCase() !== normalizedChurch.toLowerCase()
+    ) {
+      throw new AppError("Credenciais invalidas", 401);
+    }
+
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) {
       throw new AppError("Credenciais invalidas", 401);
+    }
+
+    // Contas criadas antes da obrigatoriedade de igreja sao vinculadas
+    // com seguranca somente depois da senha ter sido validada.
+    if (!user.church && normalizedChurch) {
+      await this.userRepository.update(user.id, { church: normalizedChurch });
+      user.church = normalizedChurch;
     }
 
     const role = normalizeRole(user.role);

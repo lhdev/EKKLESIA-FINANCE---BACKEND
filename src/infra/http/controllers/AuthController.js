@@ -6,14 +6,13 @@ class AuthController {
   }
 
   async register(req, res) {
-    const { name, email, church, password, role } = req.body;
+    const { name, email, church, password } = req.body;
 
     const user = await this.registerUserUseCase.execute({
       name,
       email,
       church,
       password,
-      role,
     });
 
     return res.status(201).json(user);

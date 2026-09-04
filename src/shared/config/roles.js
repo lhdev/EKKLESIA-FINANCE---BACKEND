@@ -1,6 +1,7 @@
 const ROLES = Object.freeze({
   ADMIN: "Admin",
   FINANCEIRO: "Financeiro",
+  LIDER: "Lider",
   MEMBRO: "Membro",
   MIDIA: "Midia",
 });
@@ -9,6 +10,9 @@ const ROLE_ALIASES = Object.freeze({
   admin: ROLES.ADMIN,
   financeiro: ROLES.FINANCEIRO,
   finance: ROLES.FINANCEIRO,
+  lider: ROLES.LIDER,
+  lideres: ROLES.LIDER,
+  leader: ROLES.LIDER,
   membro: ROLES.MEMBRO,
   user: ROLES.MEMBRO,
   midia: ROLES.MIDIA,
@@ -20,7 +24,12 @@ function normalizeRole(role) {
     return ROLES.MEMBRO;
   }
 
-  const normalized = ROLE_ALIASES[role.trim().toLowerCase()];
+  const roleKey = role
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  const normalized = ROLE_ALIASES[roleKey];
   return normalized || role;
 }
 

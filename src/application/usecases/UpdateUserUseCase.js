@@ -7,7 +7,7 @@ class UpdateUserUseCase {
     this.userRepository = userRepository;
   }
 
-  async execute({ id, requesterId, requesterRole, data }) {
+  async execute({ id, requesterId, requesterRole, requesterChurch, data }) {
     const normalizedRequesterRole = normalizeRole(requesterRole);
     const isAdmin = normalizedRequesterRole === ROLES.ADMIN;
     const isOwner = id === requesterId;
@@ -24,6 +24,10 @@ class UpdateUserUseCase {
 
     if (updateData.role) {
       updateData.role = normalizeRole(updateData.role);
+    }
+
+    if (isAdmin && requesterChurch) {
+      updateData.church = requesterChurch.trim();
     }
 
     if (updateData.password) {

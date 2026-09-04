@@ -14,7 +14,10 @@ class UserController {
   }
 
   async create(req, res) {
-    const user = await this.createUserUseCase.execute(req.body);
+    const user = await this.createUserUseCase.execute({
+      ...req.body,
+      church: req.user.church,
+    });
     return res.status(201).json(user);
   }
 
@@ -35,6 +38,7 @@ class UserController {
       id,
       requesterId: req.user.id,
       requesterRole: req.user.role,
+      requesterChurch: req.user.church,
       data: req.body,
     });
 
@@ -46,6 +50,7 @@ class UserController {
       id: req.user.id,
       requesterId: req.user.id,
       requesterRole: req.user.role,
+      requesterChurch: req.user.church,
       data: req.body,
     });
 

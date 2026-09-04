@@ -11,6 +11,10 @@ const rolePermissions = {
   [ROLES.FINANCEIRO]: [
     "finance.read"
   ],
+  [ROLES.LIDER]: [
+    "finance.read",
+    "finance.write"
+  ],
   [ROLES.MEMBRO]: [],
   [ROLES.MIDIA]: [],
 };
