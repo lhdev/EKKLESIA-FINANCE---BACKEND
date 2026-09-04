@@ -4,6 +4,7 @@ const {
   FinanceEntry,
   FINANCE_ENTRY_TYPES,
 } = require("../../infra/database/mongoose/schemas/FinanceEntrySchema");
+const { ROLES, normalizeRole } = require("../../shared/config/roles");
 
 const TYPE_ALIASES = Object.freeze({
   contribuicao: FINANCE_ENTRY_TYPES.CONTRIBUTION,
@@ -69,9 +70,12 @@ function serialize(entry) {
 }
 
 class ManageFinanceEntriesUseCase {
-  async list(church) {
+  async list({ church, userId, role }) {
     const normalizedChurch = validateChurch(church);
-    const entries = await FinanceEntry.find({ church: normalizedChurch })
+    const filter = { church: normalizedChurch };
+    if (normalizeRole(role) === ROLES.LIDER) filter.createdBy = userId;
+
+    const entries = await FinanceEntry.find(filter)
       .sort({ occurredAt: -1, createdAt: -1 })
       .lean();
 
@@ -103,14 +107,16 @@ class ManageFinanceEntriesUseCase {
     return serialize(entry);
   }
 
-  async update({ id, church, data }) {
+  async update({ id, church, userId, role, data }) {
     if (!mongoose.isValidObjectId(id)) {
       throw new AppError("Lancamento nao encontrado", 404);
     }
     const normalizedChurch = validateChurch(church);
     const payload = validatePayload(data);
+    const filter = { _id: id, church: normalizedChurch };
+    if (normalizeRole(role) === ROLES.LIDER) filter.createdBy = userId;
     const entry = await FinanceEntry.findOneAndUpdate(
-      { _id: id, church: normalizedChurch },
+      filter,
       payload,
       { new: true, runValidators: true }
     );
@@ -118,15 +124,14 @@ class ManageFinanceEntriesUseCase {
     return serialize(entry);
   }
 
-  async delete({ id, church }) {
+  async delete({ id, church, userId, role }) {
     if (!mongoose.isValidObjectId(id)) {
       throw new AppError("Lancamento nao encontrado", 404);
     }
     const normalizedChurch = validateChurch(church);
-    const entry = await FinanceEntry.findOneAndDelete({
-      _id: id,
-      church: normalizedChurch,
-    });
+    const filter = { _id: id, church: normalizedChurch };
+    if (normalizeRole(role) === ROLES.LIDER) filter.createdBy = userId;
+    const entry = await FinanceEntry.findOneAndDelete(filter);
     if (!entry) throw new AppError("Lancamento nao encontrado", 404);
   }
 }

@@ -12,6 +12,7 @@ const {
 const UserSchema = require("../src/infra/database/mongoose/schemas/UserSchema");
 const LoginUserUseCase = require("../src/application/usecases/LoginUserUseCase");
 const authMiddleware = require("../src/infra/http/middlewares/auth.middleware");
+const ListDepartmentFinanceUseCase = require("../src/application/usecases/ListDepartmentFinanceUseCase");
 
 test("normaliza os aliases do perfil Lideres", () => {
   assert.equal(normalizeRole("LIDER"), ROLES.LIDER);
@@ -44,7 +45,11 @@ test("saldo soma contribuicoes e subtrai despesas", async () => {
   });
 
   try {
-    const result = await new ManageFinanceEntriesUseCase().list("Igreja A");
+    const result = await new ManageFinanceEntriesUseCase().list({
+      church: "Igreja A",
+      userId: "admin-1",
+      role: ROLES.ADMIN,
+    });
     assert.deepEqual(result.summary, {
       contributionsCents: 15000,
       expensesCents: 4000,
@@ -53,6 +58,76 @@ test("saldo soma contribuicoes e subtrai despesas", async () => {
   } finally {
     FinanceEntry.find = originalFind;
   }
+});
+
+test("lider consulta somente os proprios lancamentos", async () => {
+  const originalFind = FinanceEntry.find;
+  let receivedFilter;
+  FinanceEntry.find = (filter) => {
+    receivedFilter = filter;
+    return { sort: () => ({ lean: async () => [] }) };
+  };
+
+  try {
+    await new ManageFinanceEntriesUseCase().list({
+      church: "Igreja A",
+      userId: "leader-1",
+      role: ROLES.LIDER,
+    });
+    assert.deepEqual(receivedFilter, {
+      church: "Igreja A",
+      createdBy: "leader-1",
+    });
+  } finally {
+    FinanceEntry.find = originalFind;
+  }
+});
+
+test("consolida saldos e despesas por departamento", async () => {
+  const leaderA = { _id: "leader-a", name: "Jovens", role: "Lider" };
+  const leaderB = { _id: "leader-b", name: "Irmãs", role: "LIDER" };
+  const userModel = {
+    find: () => ({
+      select: () => ({ lean: async () => [leaderA, leaderB] }),
+    }),
+  };
+  const entryModel = {
+    find: () => ({
+      sort: () => ({
+        lean: async () => [
+          {
+            createdBy: "leader-a",
+            type: FINANCE_ENTRY_TYPES.CONTRIBUTION,
+            amountCents: 10000,
+          },
+          {
+            createdBy: "leader-a",
+            type: FINANCE_ENTRY_TYPES.EXPENSE,
+            amountCents: 2000,
+          },
+          {
+            createdBy: "leader-b",
+            type: FINANCE_ENTRY_TYPES.EXPENSE,
+            amountCents: 1000,
+          },
+        ],
+      }),
+    }),
+  };
+
+  const result = await new ListDepartmentFinanceUseCase({
+    userModel,
+    entryModel,
+  }).execute("Igreja A");
+
+  assert.deepEqual(result.summary, {
+    contributionsCents: 10000,
+    expensesCents: 3000,
+    balanceCents: 7000,
+  });
+  assert.equal(result.departments[0].name, "Irmãs");
+  assert.equal(result.departments[0].expensesCents, 1000);
+  assert.equal(result.departments[1].balanceCents, 8000);
 });
 
 test("rejeita lancamento sem valor positivo", async () => {

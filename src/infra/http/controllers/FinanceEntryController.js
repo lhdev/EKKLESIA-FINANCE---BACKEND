@@ -4,7 +4,11 @@ class FinanceEntryController {
   }
 
   async list(req, res) {
-    const result = await this.useCase.list(req.user.church);
+    const result = await this.useCase.list({
+      church: req.user.church,
+      userId: req.user.id,
+      role: req.user.role,
+    });
     return res.json(result);
   }
 
@@ -21,13 +25,20 @@ class FinanceEntryController {
     const entry = await this.useCase.update({
       id: req.params.id,
       church: req.user.church,
+      userId: req.user.id,
+      role: req.user.role,
       data: req.body,
     });
     return res.json(entry);
   }
 
   async delete(req, res) {
-    await this.useCase.delete({ id: req.params.id, church: req.user.church });
+    await this.useCase.delete({
+      id: req.params.id,
+      church: req.user.church,
+      userId: req.user.id,
+      role: req.user.role,
+    });
     return res.status(204).send();
   }
 }
