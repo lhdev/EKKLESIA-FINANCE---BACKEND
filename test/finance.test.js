@@ -90,6 +90,49 @@ test("lider consulta somente os proprios lancamentos", async () => {
   }
 });
 
+test("membro consulta somente os proprios lancamentos", async () => {
+  const originalFind = FinanceEntry.find;
+  let receivedFilter;
+  FinanceEntry.find = (filter) => {
+    receivedFilter = filter;
+    return { sort: () => ({ lean: async () => [] }) };
+  };
+
+  try {
+    await new ManageFinanceEntriesUseCase().list({
+      church: "Igreja A",
+      userId: "member-1",
+      role: ROLES.MEMBRO,
+    });
+    assert.deepEqual(receivedFilter, {
+      church: "Igreja A",
+      createdBy: "member-1",
+    });
+  } finally {
+    FinanceEntry.find = originalFind;
+  }
+});
+
+test("financeiro consulta todos os lancamentos da igreja", async () => {
+  const originalFind = FinanceEntry.find;
+  let receivedFilter;
+  FinanceEntry.find = (filter) => {
+    receivedFilter = filter;
+    return { sort: () => ({ lean: async () => [] }) };
+  };
+
+  try {
+    await new ManageFinanceEntriesUseCase().list({
+      church: "Igreja A",
+      userId: "finance-1",
+      role: ROLES.FINANCEIRO,
+    });
+    assert.deepEqual(receivedFilter, { church: "Igreja A" });
+  } finally {
+    FinanceEntry.find = originalFind;
+  }
+});
+
 test("consolida saldos e despesas por departamento", async () => {
   const leaderA = { _id: "leader-a", name: "Jovens", role: "Lider" };
   const leaderB = { _id: "leader-b", name: "Irmãs", role: "LIDER" };
@@ -149,6 +192,19 @@ test("rejeita lancamento sem valor positivo", async () => {
   );
 });
 
+test("membro nao pode lancar despesa", async () => {
+  await assert.rejects(
+    () =>
+      new ManageFinanceEntriesUseCase().create({
+        church: "Igreja A",
+        userId: "507f1f77bcf86cd799439011",
+        role: ROLES.MEMBRO,
+        data: { type: "DESPESA", amountCents: 1000 },
+      }),
+    (error) => error.statusCode === 403
+  );
+});
+
 test("vincula conta legada a igreja informada depois de validar a senha", async () => {
   process.env.JWT_SECRET = "test-secret";
   const password = "senha-segura";
@@ -205,11 +261,15 @@ test("middleware usa perfil e igreja atuais mesmo com token antigo", async () =>
   }
 });
 
-test("permissoes individuais substituem as permissoes padrao do perfil", () => {
-  assert.deepEqual(normalizePermissions([], ROLES.FINANCEIRO), []);
+test("perfis financeiros recebem as permissoes minimas do fluxo", () => {
+  assert.deepEqual(normalizePermissions([], ROLES.FINANCEIRO), [
+    PERMISSIONS.DASHBOARD_VIEW,
+    PERMISSIONS.FINANCE_VIEW,
+    PERMISSIONS.DEPARTMENTS_VIEW,
+  ]);
   assert.deepEqual(
     normalizePermissions(["finance.view", "finance.read"], ROLES.MEMBRO),
-    [PERMISSIONS.FINANCE_VIEW]
+    [PERMISSIONS.FINANCE_VIEW, PERMISSIONS.DASHBOARD_VIEW]
   );
 });
 
@@ -253,6 +313,7 @@ test("admin cadastra usuario com permissoes individuais", async () => {
   assert.deepEqual(result.permissions, [
     PERMISSIONS.FINANCE_VIEW,
     PERMISSIONS.DEPARTMENTS_VIEW,
+    PERMISSIONS.DASHBOARD_VIEW,
   ]);
 });
 

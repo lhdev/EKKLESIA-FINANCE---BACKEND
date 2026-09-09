@@ -3,6 +3,8 @@ const AppError = require("../../shared/errors/AppError");
 const {
   FinanceEntry,
   FINANCE_ENTRY_TYPES,
+  FINANCE_CONTRIBUTION_CATEGORIES,
+  FINANCE_ENTRY_STATUSES,
 } = require("../../infra/database/mongoose/schemas/FinanceEntrySchema");
 const { ROLES, normalizeRole } = require("../../shared/config/roles");
 
@@ -14,16 +16,48 @@ const TYPE_ALIASES = Object.freeze({
   expense: FINANCE_ENTRY_TYPES.EXPENSE,
 });
 
-function normalizeType(value) {
-  if (typeof value !== "string") return null;
-  const key = value
+const CATEGORY_ALIASES = Object.freeze({
+  dizimo: FINANCE_CONTRIBUTION_CATEGORIES.TITHE,
+  tithe: FINANCE_CONTRIBUTION_CATEGORIES.TITHE,
+  oferta: FINANCE_CONTRIBUTION_CATEGORIES.OFFERING,
+  offering: FINANCE_CONTRIBUTION_CATEGORIES.OFFERING,
+  proposito: FINANCE_CONTRIBUTION_CATEGORIES.PURPOSE,
+  purpose: FINANCE_CONTRIBUTION_CATEGORIES.PURPOSE,
+  outro: FINANCE_CONTRIBUTION_CATEGORIES.OTHER,
+  other: FINANCE_CONTRIBUTION_CATEGORIES.OTHER,
+});
+
+function normalizeText(value) {
+  if (typeof value !== "string") return "";
+  return value
     .trim()
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
+}
+
+function normalizeType(value) {
+  if (typeof value !== "string") return null;
+  const key = normalizeText(value);
   return TYPE_ALIASES[key] || Object.values(FINANCE_ENTRY_TYPES).find(
     (type) => type === value.trim().toUpperCase()
   );
+}
+
+function normalizeCategory(value) {
+  const key = normalizeText(value);
+  return CATEGORY_ALIASES[key] || Object.values(
+    FINANCE_CONTRIBUTION_CATEGORIES
+  ).find((category) => category === value?.trim().toUpperCase());
+}
+
+function normalizeStatus(value) {
+  if (typeof value !== "string") return FINANCE_ENTRY_STATUSES.PENDING;
+  const normalized = normalizeText(value);
+  if (normalized === "confirmado" || normalized === "confirmed") {
+    return FINANCE_ENTRY_STATUSES.CONFIRMED;
+  }
+  return FINANCE_ENTRY_STATUSES.PENDING;
 }
 
 function validateChurch(church) {
@@ -37,6 +71,8 @@ function validatePayload(data) {
   const type = normalizeType(data.type);
   const amountCents = Number(data.amountCents);
   const occurredAt = data.occurredAt ? new Date(data.occurredAt) : new Date();
+  const category = normalizeCategory(data.category) ||
+    FINANCE_CONTRIBUTION_CATEGORIES.OTHER;
 
   if (!type) {
     throw new AppError("Tipo deve ser CONTRIBUICAO ou DESPESA", 400);
@@ -51,6 +87,8 @@ function validatePayload(data) {
   return {
     type,
     amountCents,
+    category,
+    status: normalizeStatus(data.status),
     occurredAt,
     description: typeof data.description === "string" ? data.description.trim() : "",
   };
@@ -63,7 +101,15 @@ function serialize(entry) {
     amountCents: entry.amountCents,
     description: entry.description,
     occurredAt: entry.occurredAt,
-    createdBy: entry.createdBy,
+    category: entry.category,
+    status: entry.status,
+    createdBy: entry.createdBy?._id
+      ? {
+          id: entry.createdBy._id,
+          name: entry.createdBy.name,
+          email: entry.createdBy.email,
+        }
+      : entry.createdBy,
     createdAt: entry.createdAt,
     updatedAt: entry.updatedAt,
   };
@@ -73,11 +119,19 @@ class ManageFinanceEntriesUseCase {
   async list({ church, userId, role }) {
     const normalizedChurch = validateChurch(church);
     const filter = { church: normalizedChurch };
-    if (normalizeRole(role) === ROLES.LIDER) filter.createdBy = userId;
+    const normalizedRole = normalizeRole(role);
+    if (
+      normalizedRole === ROLES.LIDER ||
+      normalizedRole === ROLES.MEMBRO
+    ) {
+      filter.createdBy = userId;
+    }
 
-    const entries = await FinanceEntry.find(filter)
-      .sort({ occurredAt: -1, createdAt: -1 })
-      .lean();
+    const query = FinanceEntry.find(filter);
+    if (typeof query.populate === "function") {
+      query.populate("createdBy", "name email");
+    }
+    const entries = await query.sort({ occurredAt: -1, createdAt: -1 }).lean();
 
     const summary = entries.reduce(
       (totals, entry) => {
@@ -96,9 +150,21 @@ class ManageFinanceEntriesUseCase {
     return { entries: entries.map(serialize), summary };
   }
 
-  async create({ church, userId, data }) {
+  async create({ church, userId, role, data }) {
     const normalizedChurch = validateChurch(church);
     const payload = validatePayload(data);
+    if (
+      normalizeRole(role) === ROLES.MEMBRO &&
+      payload.type !== FINANCE_ENTRY_TYPES.CONTRIBUTION
+    ) {
+      throw new AppError("Membro pode lancar apenas contribuicoes", 403);
+    }
+    if (
+      normalizeRole(role) === ROLES.MEMBRO &&
+      payload.category === FINANCE_CONTRIBUTION_CATEGORIES.OTHER
+    ) {
+      throw new AppError("Informe o tipo da contribuicao", 400);
+    }
     const entry = await FinanceEntry.create({
       ...payload,
       church: normalizedChurch,
@@ -108,6 +174,9 @@ class ManageFinanceEntriesUseCase {
   }
 
   async update({ id, church, userId, role, data }) {
+    if (normalizeRole(role) === ROLES.MEMBRO) {
+      throw new AppError("Membro nao pode alterar lancamentos", 403);
+    }
     if (!mongoose.isValidObjectId(id)) {
       throw new AppError("Lancamento nao encontrado", 404);
     }
@@ -125,6 +194,9 @@ class ManageFinanceEntriesUseCase {
   }
 
   async delete({ id, church, userId, role }) {
+    if (normalizeRole(role) === ROLES.MEMBRO) {
+      throw new AppError("Membro nao pode excluir lancamentos", 403);
+    }
     if (!mongoose.isValidObjectId(id)) {
       throw new AppError("Lancamento nao encontrado", 404);
     }

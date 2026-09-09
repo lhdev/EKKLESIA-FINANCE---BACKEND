@@ -16,6 +16,7 @@ class FinanceEntryController {
     const entry = await this.useCase.create({
       church: req.user.church,
       userId: req.user.id,
+      role: req.user.role,
       data: req.body,
     });
     return res.status(201).json(entry);

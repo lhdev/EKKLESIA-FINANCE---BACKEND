@@ -30,7 +30,10 @@ const rolePermissions = Object.freeze({
     PERMISSIONS.DASHBOARD_VIEW,
     PERMISSIONS.FINANCE_VIEW,
   ],
-  [ROLES.MEMBRO]: [PERMISSIONS.DASHBOARD_VIEW],
+  [ROLES.MEMBRO]: [
+    PERMISSIONS.DASHBOARD_VIEW,
+    PERMISSIONS.FINANCE_VIEW,
+  ],
   [ROLES.MIDIA]: [
     PERMISSIONS.DASHBOARD_VIEW,
     PERMISSIONS.MEDIA_VIEW,
@@ -51,8 +54,20 @@ function normalizePermissions(permissions, role) {
   }
 
   const source = Array.isArray(permissions)
-    ? permissions
-    : rolePermissions[normalizedRole] || [];
+    ? [...permissions]
+    : [...(rolePermissions[normalizedRole] || [])];
+
+  if (normalizedRole === ROLES.MEMBRO) {
+    source.push(PERMISSIONS.DASHBOARD_VIEW, PERMISSIONS.FINANCE_VIEW);
+  }
+
+  if (normalizedRole === ROLES.FINANCEIRO) {
+    source.push(
+      PERMISSIONS.DASHBOARD_VIEW,
+      PERMISSIONS.FINANCE_VIEW,
+      PERMISSIONS.DEPARTMENTS_VIEW
+    );
+  }
 
   return [...new Set(source.map(normalizePermission).filter(Boolean))];
 }
