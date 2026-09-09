@@ -212,9 +212,31 @@ test("membro deve informar dizimo, oferta ou proposito", async () => {
         church: "Igreja A",
         userId: "507f1f77bcf86cd799439011",
         role: ROLES.MEMBRO,
-        data: { type: "CONTRIBUICAO", amountCents: 1000 },
+        data: {
+          type: "CONTRIBUICAO",
+          amountCents: 1000,
+          receiptUrl: "https://example.com/comprovante.pdf",
+        },
       }),
     (error) => error.statusCode === 400
+  );
+});
+
+test("membro deve anexar comprovante", async () => {
+  await assert.rejects(
+    () =>
+      new ManageFinanceEntriesUseCase().create({
+        church: "Igreja A",
+        userId: "507f1f77bcf86cd799439011",
+        role: ROLES.MEMBRO,
+        data: {
+          type: "CONTRIBUICAO",
+          category: "DIZIMO",
+          amountCents: 1000,
+        },
+      }),
+    (error) =>
+      error.statusCode === 400 && error.message === "Comprovante obrigatorio"
   );
 });
 

@@ -37,6 +37,10 @@ const FinanceEntrySchema = new mongoose.Schema(
       default: FINANCE_ENTRY_STATUSES.PENDING,
     },
     description: { type: String, trim: true, maxlength: 500, default: "" },
+    receiptUrl: { type: String, trim: true, default: "" },
+    receiptFileName: { type: String, trim: true, default: "" },
+    receiptStorageId: { type: String, trim: true, default: "" },
+    receiptResourceType: { type: String, trim: true, default: "auto" },
     occurredAt: { type: Date, required: true, default: Date.now, index: true },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,

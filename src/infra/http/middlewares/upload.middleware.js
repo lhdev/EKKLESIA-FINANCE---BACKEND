@@ -20,6 +20,15 @@ const uploadDashboardImage = multer({
   },
 });
 
+const uploadFinanceReceipt = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: imageFileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024,
+  },
+});
+
 module.exports = {
   uploadDashboardImage,
+  uploadFinanceReceipt,
 };

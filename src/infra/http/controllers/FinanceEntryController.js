@@ -1,6 +1,7 @@
 class FinanceEntryController {
-  constructor(useCase) {
+  constructor(useCase, mediaStorage) {
     this.useCase = useCase;
+    this.mediaStorage = mediaStorage;
   }
 
   async list(req, res) {
@@ -13,13 +14,39 @@ class FinanceEntryController {
   }
 
   async create(req, res) {
-    const entry = await this.useCase.create({
-      church: req.user.church,
-      userId: req.user.id,
-      role: req.user.role,
-      data: req.body,
-    });
-    return res.status(201).json(entry);
+    let uploadedFile = null;
+
+    try {
+      if (req.file) {
+        uploadedFile = await this.mediaStorage.upload({
+          bytes: req.file.buffer,
+          fileName: req.file.originalname,
+          folder: "ekklesia/finance-receipts",
+        });
+      }
+
+      const entry = await this.useCase.create({
+        church: req.user.church,
+        userId: req.user.id,
+        role: req.user.role,
+        data: {
+          ...req.body,
+          receiptUrl: uploadedFile?.url || "",
+          receiptFileName: req.file?.originalname || "",
+          receiptStorageId: uploadedFile?.publicId || "",
+          receiptResourceType: uploadedFile?.resourceType || "auto",
+        },
+      });
+      return res.status(201).json(entry);
+    } catch (error) {
+      if (uploadedFile?.publicId) {
+        await this.mediaStorage.delete({
+          publicId: uploadedFile.publicId,
+          resourceType: uploadedFile.resourceType,
+        }).catch(() => null);
+      }
+      throw error;
+    }
   }
 
   async update(req, res) {

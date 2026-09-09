@@ -6,9 +6,14 @@ const ManageFinanceEntriesUseCase = require("../../../application/usecases/Manag
 const FinanceEntryController = require("../controllers/FinanceEntryController");
 const ListDepartmentFinanceUseCase = require("../../../application/usecases/ListDepartmentFinanceUseCase");
 const DepartmentFinanceController = require("../controllers/DepartmentFinanceController");
+const CloudinaryMediaStorage = require("../../providers/CloudinaryMediaStorage");
+const { uploadFinanceReceipt } = require("../middlewares/upload.middleware");
 
 const router = express.Router();
-const controller = new FinanceEntryController(new ManageFinanceEntriesUseCase());
+const controller = new FinanceEntryController(
+  new ManageFinanceEntriesUseCase(),
+  new CloudinaryMediaStorage()
+);
 const departmentController = new DepartmentFinanceController(
   new ListDepartmentFinanceUseCase()
 );
@@ -21,6 +26,7 @@ router.get(
 router.post(
   "/entries",
   permissionMiddleware(PERMISSIONS.FINANCE_VIEW),
+  uploadFinanceReceipt.single("receipt"),
   (req, res) => controller.create(req, res)
 );
 router.put(

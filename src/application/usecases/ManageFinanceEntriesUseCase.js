@@ -91,6 +91,22 @@ function validatePayload(data) {
     status: normalizeStatus(data.status),
     occurredAt,
     description: typeof data.description === "string" ? data.description.trim() : "",
+    ...(data.receiptUrl !== undefined && {
+      receiptUrl:
+        typeof data.receiptUrl === "string" ? data.receiptUrl.trim() : "",
+      receiptFileName:
+        typeof data.receiptFileName === "string"
+          ? data.receiptFileName.trim()
+          : "",
+      receiptStorageId:
+        typeof data.receiptStorageId === "string"
+          ? data.receiptStorageId.trim()
+          : "",
+      receiptResourceType:
+        typeof data.receiptResourceType === "string"
+          ? data.receiptResourceType.trim()
+          : "auto",
+    }),
   };
 }
 
@@ -103,6 +119,8 @@ function serialize(entry) {
     occurredAt: entry.occurredAt,
     category: entry.category,
     status: entry.status,
+    receiptUrl: entry.receiptUrl,
+    receiptFileName: entry.receiptFileName,
     createdBy: entry.createdBy?._id
       ? {
           id: entry.createdBy._id,
@@ -164,6 +182,9 @@ class ManageFinanceEntriesUseCase {
       payload.category === FINANCE_CONTRIBUTION_CATEGORIES.OTHER
     ) {
       throw new AppError("Informe o tipo da contribuicao", 400);
+    }
+    if (normalizeRole(role) === ROLES.MEMBRO && !payload.receiptUrl) {
+      throw new AppError("Comprovante obrigatorio", 400);
     }
     const entry = await FinanceEntry.create({
       ...payload,
