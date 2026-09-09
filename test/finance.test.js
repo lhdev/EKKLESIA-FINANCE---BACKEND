@@ -205,6 +205,19 @@ test("membro nao pode lancar despesa", async () => {
   );
 });
 
+test("membro deve informar dizimo, oferta ou proposito", async () => {
+  await assert.rejects(
+    () =>
+      new ManageFinanceEntriesUseCase().create({
+        church: "Igreja A",
+        userId: "507f1f77bcf86cd799439011",
+        role: ROLES.MEMBRO,
+        data: { type: "CONTRIBUICAO", amountCents: 1000 },
+      }),
+    (error) => error.statusCode === 400
+  );
+});
+
 test("vincula conta legada a igreja informada depois de validar a senha", async () => {
   process.env.JWT_SECRET = "test-secret";
   const password = "senha-segura";
