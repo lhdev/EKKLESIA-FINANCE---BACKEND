@@ -277,3 +277,51 @@ test("admin nao altera permissoes de usuario de outra igreja", async () => {
     (error) => error.statusCode === 403
   );
 });
+
+test("admin redefine a senha de usuario da propria igreja", async () => {
+  let updatedData;
+  const repository = {
+    findById: async () => ({
+      id: "user-3",
+      church: "adpv",
+      role: ROLES.MEMBRO,
+    }),
+    update: async (id, data) => {
+      updatedData = data;
+      return { id, church: "adpv", role: ROLES.MEMBRO };
+    },
+  };
+
+  await new UpdateUserUseCase(repository).execute({
+    id: "user-3",
+    requesterId: "admin-1",
+    requesterRole: ROLES.ADMIN,
+    requesterChurch: "adpv",
+    data: { password: "nova-senha" },
+  });
+
+  assert.notEqual(updatedData.password, "nova-senha");
+  assert.equal(await bcrypt.compare("nova-senha", updatedData.password), true);
+});
+
+test("rejeita redefinicao com senha muito curta", async () => {
+  const repository = {
+    findById: async () => ({
+      id: "user-4",
+      church: "adpv",
+      role: ROLES.MEMBRO,
+    }),
+    update: async () => assert.fail("update nao deveria ser chamado"),
+  };
+
+  await assert.rejects(
+    () => new UpdateUserUseCase(repository).execute({
+      id: "user-4",
+      requesterId: "admin-1",
+      requesterRole: ROLES.ADMIN,
+      requesterChurch: "adpv",
+      data: { password: "123" },
+    }),
+    (error) => error.statusCode === 400
+  );
+});

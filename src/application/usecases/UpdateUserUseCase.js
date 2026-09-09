@@ -65,7 +65,14 @@ class UpdateUserUseCase {
       delete updateData.church;
     }
 
-    if (updateData.password) {
+    if (updateData.password !== undefined) {
+      if (
+        typeof updateData.password !== "string" ||
+        updateData.password.length < 4
+      ) {
+        throw new AppError("A senha deve ter pelo menos 4 caracteres", 400);
+      }
+
       updateData.password = await bcrypt.hash(updateData.password, 8);
     }
 
