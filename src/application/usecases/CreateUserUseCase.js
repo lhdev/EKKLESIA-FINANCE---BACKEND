@@ -1,15 +1,28 @@
 const bcrypt = require("bcryptjs");
 const AppError = require("../../shared/errors/AppError");
 const { normalizeRole } = require("../../shared/config/roles");
+const {
+  hasOnlyAllowedPermissions,
+  normalizePermissions,
+} = require("../../shared/config/permissions");
 
 class CreateUserUseCase {
   constructor(userRepository) {
     this.userRepository = userRepository;
   }
 
-  async execute({ name, email, church, password, role }) {
+  async execute({ name, email, church, password, role, permissions }) {
+    if (!name?.trim() || !email?.trim() || !password) {
+      throw new AppError("Nome, email e senha sao obrigatorios", 400);
+    }
+
+    if (permissions !== undefined && !hasOnlyAllowedPermissions(permissions)) {
+      throw new AppError("Permissoes invalidas", 400);
+    }
+
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedChurch = typeof church === "string" ? church.trim() : church;
+    const normalizedRole = normalizeRole(role);
 
     const exists = normalizedChurch
       ? await this.userRepository.findByEmailAndChurch(normalizedEmail, normalizedChurch)
@@ -22,11 +35,12 @@ class CreateUserUseCase {
     const hashedPassword = await bcrypt.hash(password, 8);
 
     return this.userRepository.create({
-      name,
+      name: name.trim(),
       email: normalizedEmail,
       church: normalizedChurch,
       password: hashedPassword,
-      role: normalizeRole(role),
+      role: normalizedRole,
+      permissions: normalizePermissions(permissions, normalizedRole),
     });
   }
 }

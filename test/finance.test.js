@@ -13,6 +13,13 @@ const UserSchema = require("../src/infra/database/mongoose/schemas/UserSchema");
 const LoginUserUseCase = require("../src/application/usecases/LoginUserUseCase");
 const authMiddleware = require("../src/infra/http/middlewares/auth.middleware");
 const ListDepartmentFinanceUseCase = require("../src/application/usecases/ListDepartmentFinanceUseCase");
+const CreateUserUseCase = require("../src/application/usecases/CreateUserUseCase");
+const UpdateUserUseCase = require("../src/application/usecases/UpdateUserUseCase");
+const permissionMiddleware = require("../src/infra/http/middlewares/permission.middleware");
+const {
+  PERMISSIONS,
+  normalizePermissions,
+} = require("../src/shared/config/permissions");
 
 test("normaliza os aliases do perfil Lideres", () => {
   assert.equal(normalizeRole("LIDER"), ROLES.LIDER);
@@ -196,4 +203,77 @@ test("middleware usa perfil e igreja atuais mesmo com token antigo", async () =>
   } finally {
     UserSchema.findById = originalFindById;
   }
+});
+
+test("permissoes individuais substituem as permissoes padrao do perfil", () => {
+  assert.deepEqual(normalizePermissions([], ROLES.FINANCEIRO), []);
+  assert.deepEqual(
+    normalizePermissions(["finance.view", "finance.read"], ROLES.MEMBRO),
+    [PERMISSIONS.FINANCE_VIEW]
+  );
+});
+
+test("middleware financeiro respeita a permissao individual", () => {
+  const middleware = permissionMiddleware(PERMISSIONS.FINANCE_VIEW);
+  let called = false;
+
+  middleware(
+    { user: { role: ROLES.MEMBRO, permissions: [PERMISSIONS.FINANCE_VIEW] } },
+    {},
+    () => { called = true; }
+  );
+
+  assert.equal(called, true);
+  assert.throws(
+    () => middleware({ user: { role: ROLES.FINANCEIRO, permissions: [] } }, {}, () => {}),
+    (error) => error.statusCode === 403
+  );
+});
+
+test("admin cadastra usuario com permissoes individuais", async () => {
+  let createdData;
+  const repository = {
+    findByEmailAndChurch: async () => null,
+    create: async (data) => {
+      createdData = data;
+      return { id: "user-1", ...data, password: undefined };
+    },
+  };
+
+  const result = await new CreateUserUseCase(repository).execute({
+    name: "Pessoa Financeira",
+    email: "PESSOA@example.com",
+    church: "adpv",
+    password: "senha123",
+    role: ROLES.MEMBRO,
+    permissions: [PERMISSIONS.FINANCE_VIEW, PERMISSIONS.DEPARTMENTS_VIEW],
+  });
+
+  assert.equal(createdData.email, "pessoa@example.com");
+  assert.deepEqual(result.permissions, [
+    PERMISSIONS.FINANCE_VIEW,
+    PERMISSIONS.DEPARTMENTS_VIEW,
+  ]);
+});
+
+test("admin nao altera permissoes de usuario de outra igreja", async () => {
+  const repository = {
+    findById: async () => ({
+      id: "user-2",
+      church: "outra-igreja",
+      role: ROLES.MEMBRO,
+    }),
+    update: async () => assert.fail("update nao deveria ser chamado"),
+  };
+
+  await assert.rejects(
+    () => new UpdateUserUseCase(repository).execute({
+      id: "user-2",
+      requesterId: "admin-1",
+      requesterRole: ROLES.ADMIN,
+      requesterChurch: "adpv",
+      data: { permissions: [PERMISSIONS.FINANCE_VIEW] },
+    }),
+    (error) => error.statusCode === 403
+  );
 });

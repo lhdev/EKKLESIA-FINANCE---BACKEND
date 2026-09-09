@@ -3,10 +3,9 @@ class ListUsersUseCase {
       this.userRepository = userRepository;
     }
   
-    async execute() {
-      return this.userRepository.findAll();
+    async execute(church) {
+      return this.userRepository.findAll(church);
     }
   }
   
   module.exports = ListUsersUseCase;
-  

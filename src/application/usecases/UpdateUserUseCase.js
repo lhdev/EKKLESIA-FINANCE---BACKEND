@@ -1,6 +1,17 @@
 const bcrypt = require("bcryptjs");
 const AppError = require("../../shared/errors/AppError");
 const { ROLES, normalizeRole } = require("../../shared/config/roles");
+const {
+  hasOnlyAllowedPermissions,
+  normalizePermissions,
+} = require("../../shared/config/permissions");
+
+function sameChurch(first, second) {
+  return (
+    Boolean(first && second) &&
+    first.trim().toLowerCase() === second.trim().toLowerCase()
+  );
+}
 
 class UpdateUserUseCase {
   constructor(userRepository) {
@@ -16,30 +27,49 @@ class UpdateUserUseCase {
       throw new AppError("Sem permissao", 403);
     }
 
+    const existingUser = await this.userRepository.findById(id);
+    if (!existingUser) {
+      throw new AppError("Usuario nao encontrado", 404);
+    }
+
+    if (isAdmin && !sameChurch(existingUser.church, requesterChurch)) {
+      throw new AppError("Sem permissao para alterar usuario de outra igreja", 403);
+    }
+
     const updateData = { ...data };
 
-    if (!isAdmin && updateData.role) {
-      throw new AppError("Somente admin pode alterar perfil de acesso", 403);
+    if (
+      !isAdmin &&
+      (updateData.role !== undefined || updateData.permissions !== undefined)
+    ) {
+      throw new AppError("Somente admin pode alterar perfil e permissoes", 403);
     }
 
     if (updateData.role) {
       updateData.role = normalizeRole(updateData.role);
     }
 
+    if (updateData.permissions !== undefined) {
+      if (!hasOnlyAllowedPermissions(updateData.permissions)) {
+        throw new AppError("Permissoes invalidas", 400);
+      }
+      updateData.permissions = normalizePermissions(
+        updateData.permissions,
+        updateData.role || existingUser.role
+      );
+    }
+
     if (isAdmin && requesterChurch) {
       updateData.church = requesterChurch.trim();
+    } else {
+      delete updateData.church;
     }
 
     if (updateData.password) {
       updateData.password = await bcrypt.hash(updateData.password, 8);
     }
 
-    const user = await this.userRepository.update(id, updateData);
-    if (!user) {
-      throw new AppError("Usuario nao encontrado", 404);
-    }
-
-    return user;
+    return this.userRepository.update(id, updateData);
   }
 }
 

@@ -22,7 +22,7 @@ class UserController {
   }
 
   async list(req, res) {
-    const users = await this.listUsersUseCase.execute();
+    const users = await this.listUsersUseCase.execute(req.user.church);
     return res.json(users);
   }
 
@@ -58,7 +58,12 @@ class UserController {
   }
 
   async delete(req, res) {
-    await this.deleteUserUseCase.execute(req.params.id, req.user.role);
+    await this.deleteUserUseCase.execute({
+      id: req.params.id,
+      requesterId: req.user.id,
+      requesterRole: req.user.role,
+      requesterChurch: req.user.church,
+    });
     return res.status(204).send();
   }
 }

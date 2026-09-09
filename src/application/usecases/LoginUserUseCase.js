@@ -1,7 +1,7 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const AppError = require("../../shared/errors/AppError");
-const rolePermissions = require("../../shared/config/permissions");
+const { normalizePermissions } = require("../../shared/config/permissions");
 const { normalizeRole } = require("../../shared/config/roles");
 
 class LoginUserUseCase {
@@ -53,7 +53,7 @@ class LoginUserUseCase {
     }
 
     const role = normalizeRole(user.role);
-    const permissions = rolePermissions[role] || [];
+    const permissions = normalizePermissions(user.permissions, role);
 
     const token = jwt.sign(
       { id: user.id, church: user.church, role, permissions },
@@ -68,6 +68,7 @@ class LoginUserUseCase {
         email: user.email,
         church: user.church,
         role,
+        permissions,
       },
       token,
     };

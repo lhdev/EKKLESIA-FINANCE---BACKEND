@@ -1,6 +1,7 @@
 const UserRepository = require("../../../domain/repositories/UserRepository");
 const UserSchema = require("./schemas/UserSchema");
 const { normalizeRole } = require("../../../shared/config/roles");
+const { normalizePermissions } = require("../../../shared/config/permissions");
 
 function escapeRegExp(text) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -21,6 +22,7 @@ function mapUser(user, { includePassword = false } = {}) {
     email: user.email,
     church: user.church,
     role: normalizeRole(user.role),
+    permissions: normalizePermissions(user.permissions, user.role),
   };
 
   if (includePassword && user.password) {
@@ -54,8 +56,9 @@ class UserRepositoryMongo extends UserRepository {
     return mapUser(user, { includePassword: withPassword });
   }
 
-  async findAll() {
-    const users = await UserSchema.find().select("-password");
+  async findAll(church) {
+    const filter = church ? { church: exactInsensitive(church) } : {};
+    const users = await UserSchema.find(filter).select("-password");
     return users.map((user) => mapUser(user));
   }
 

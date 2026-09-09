@@ -3,7 +3,7 @@ class UserRepository {
     throw new Error("Method not implemented");
   }
 
-  findAll() {
+  findAll(church) {
     throw new Error("Method not implemented");
   }
 

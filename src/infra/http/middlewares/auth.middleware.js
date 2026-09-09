@@ -1,7 +1,7 @@
 const jwt = require("jsonwebtoken");
 const AppError = require("../../../shared/errors/AppError");
 const { normalizeRole } = require("../../../shared/config/roles");
-const rolePermissions = require("../../../shared/config/permissions");
+const { normalizePermissions } = require("../../../shared/config/permissions");
 const UserSchema = require("../../database/mongoose/schemas/UserSchema");
 
 async function ensureAuthenticated(req, res, next) {
@@ -24,7 +24,7 @@ async function ensureAuthenticated(req, res, next) {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const currentUser = await UserSchema.findById(decoded.id)
-      .select("church role")
+      .select("church role permissions")
       .lean();
 
     if (!currentUser) {
@@ -35,7 +35,7 @@ async function ensureAuthenticated(req, res, next) {
     req.user = {
       id: decoded.id,
       church: currentUser.church,
-      permissions: rolePermissions[role] || [],
+      permissions: normalizePermissions(currentUser.permissions, role),
       role,
     };
 
