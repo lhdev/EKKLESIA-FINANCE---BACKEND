@@ -16,6 +16,7 @@ function mapUser(user, { includePassword = false } = {}) {
     return null;
   }
 
+  const profile = user.profile?.toObject?.() || user.profile || {};
   const mappedUser = {
     id: user._id,
     name: user.name,
@@ -24,10 +25,11 @@ function mapUser(user, { includePassword = false } = {}) {
     birthDate: user.birthDate || null,
     status: user.status || "ACTIVE",
     isLeader: Boolean(user.isLeader) || normalizeRole(user.role) === "Lider",
+    photoUrl: user.photoUrl || "",
     church: user.church,
     role: normalizeRole(user.role),
     permissions: normalizePermissions(user.permissions, user.role),
-    profile: user.profile || {},
+    profile,
   };
 
   if (includePassword && user.password) {

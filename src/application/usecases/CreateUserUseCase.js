@@ -58,6 +58,16 @@ class CreateUserUseCase {
       throw new AppError("Status de membro invalido", 400);
     }
 
+    const rawChildren = data.childrenDetails || data.children;
+    const childrenDetails = Array.isArray(rawChildren)
+      ? rawChildren
+          .map((child) => ({
+            name: String(child?.name || child?.nome || "").trim(),
+            birthDate: child?.birthDate || child?.dataNascimento || undefined,
+          }))
+          .filter((child) => child.name)
+      : [];
+
     return this.userRepository.create({
       name: name.trim(),
       email: normalizedEmail,
@@ -65,6 +75,7 @@ class CreateUserUseCase {
       birthDate: data.birthDate || data.dataNascimento || undefined,
       status: normalizedStatus,
       isLeader: data.isLeader === true || normalizeRole(role) === "Lider",
+      photoUrl: String(data.photoUrl || data.fotoUrl || "").trim(),
       church: normalizedChurch,
       password: hashedPassword,
       role: normalizedRole,
@@ -75,15 +86,24 @@ class CreateUserUseCase {
         gender: data.gender || data.sexo || "",
         maritalStatus: data.maritalStatus || data.estadoCivil || "",
         spouse: data.spouse || data.nomeConjuge || "",
-        children: data.children || data.nomeFilhos || "",
+        children: typeof data.children === "string"
+          ? data.children
+          : data.nomeFilhos || "",
+        childrenDetails,
         father: data.father || data.filiacaoPai || "",
         mother: data.mother || data.filiacaoMae || "",
         baptized: data.baptized === true || data.batismoNasAguas === true,
         previousChurch: data.previousChurch || data.igrejaAnterior || "",
         previousPastor: data.previousPastor || data.pastorAnterior || "",
         positions: data.positions || data.cargosExercidos || "",
-        desiredFunction: data.desiredFunction || data.desejaExercerFuncao || "",
+        desiredFunction:
+          data.desiredFunction === true ||
+          data.desejaExercerFuncao === true ||
+          String(data.desiredFunction || data.desejaExercerFuncao || "")
+            .trim()
+            .toLowerCase() === "sim",
         admissionType: data.admissionType || data.tipoAdesao || "",
+        newConvert: data.newConvert === true || data.novoConvertido === true,
       },
     });
   }

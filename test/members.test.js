@@ -4,6 +4,8 @@ const assert = require("node:assert/strict");
 const CreateUserUseCase = require("../src/application/usecases/CreateUserUseCase");
 const ImportUsersUseCase = require("../src/application/usecases/ImportUsersUseCase");
 const ListUsersUseCase = require("../src/application/usecases/ListUsersUseCase");
+const UpdateUserUseCase = require("../src/application/usecases/UpdateUserUseCase");
+const { ROLES } = require("../src/shared/config/roles");
 
 test("cria cadastro de membro sem senha informada pelo painel", async () => {
   let createdData;
@@ -77,4 +79,72 @@ test("encaminha busca e status normalizados para o repositorio", async () => {
     church: "adpv",
     filters: { status: "INACTIVE", search: "Maria" },
   });
+});
+
+test("salva dados pessoais, filhos e vida crista enviados pelo app", async () => {
+  let updated;
+  const repository = {
+    findById: async () => ({
+      id: "member-1",
+      church: "adpv",
+      role: ROLES.MEMBRO,
+      profile: { cpf: "", address: "Endereco antigo" },
+    }),
+    update: async (_id, data) => {
+      updated = data;
+      return data;
+    },
+  };
+
+  await new UpdateUserUseCase(repository).execute({
+    id: "member-1",
+    requesterId: "member-1",
+    requesterRole: ROLES.MEMBRO,
+    requesterChurch: "adpv",
+    data: {
+      nomeCompleto: "Maria Atualizada",
+      telefone1: "(11) 91234-5678",
+      dataNascimento: "1992-04-03T00:00:00.000Z",
+      cpf: "",
+      endereco: "Endereco novo",
+      novoConvertido: true,
+      desejaExercerFuncao: true,
+      children: [
+        { name: "Filho Um", birthDate: "2015-06-10T00:00:00.000Z" },
+        { name: "Filho Dois", birthDate: "2018-09-20T00:00:00.000Z" },
+      ],
+    },
+  });
+
+  assert.equal(updated.name, "Maria Atualizada");
+  assert.equal(updated.phone, "(11) 91234-5678");
+  assert.equal(updated.profile.address, "Endereco novo");
+  assert.equal(updated.profile.newConvert, true);
+  assert.equal(updated.profile.desiredFunction, true);
+  assert.deepEqual(updated.profile.childrenDetails, [
+    { name: "Filho Um", birthDate: "2015-06-10T00:00:00.000Z" },
+    { name: "Filho Dois", birthDate: "2018-09-20T00:00:00.000Z" },
+  ]);
+});
+
+test("rejeita salvar perfil sem nome completo", async () => {
+  const repository = {
+    findById: async () => ({
+      id: "member-1",
+      church: "adpv",
+      role: ROLES.MEMBRO,
+    }),
+    update: async () => assert.fail("update nao deveria ser chamado"),
+  };
+
+  await assert.rejects(
+    () => new UpdateUserUseCase(repository).execute({
+      id: "member-1",
+      requesterId: "member-1",
+      requesterRole: ROLES.MEMBRO,
+      requesterChurch: "adpv",
+      data: { nomeCompleto: "   " },
+    }),
+    (error) => error.statusCode === 400
+  );
 });
