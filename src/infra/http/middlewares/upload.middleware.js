@@ -28,7 +28,28 @@ const uploadFinanceReceipt = multer({
   },
 });
 
+function userImportFileFilter(_request, file, callback) {
+  const fileName = file.originalname.toLowerCase();
+  const isSupported = fileName.endsWith('.csv') || fileName.endsWith('.xlsx');
+
+  if (!isSupported) {
+    callback(new Error('Apenas arquivos CSV e XLSX sao permitidos'));
+    return;
+  }
+
+  callback(null, true);
+}
+
+const uploadUserImport = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: userImportFileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+  },
+});
+
 module.exports = {
   uploadDashboardImage,
   uploadFinanceReceipt,
+  uploadUserImport,
 };

@@ -4,13 +4,15 @@ class UserController {
     listUsersUseCase,
     updateUserUseCase,
     deleteUserUseCase,
-    getMeUseCase
+    getMeUseCase,
+    importUsersUseCase
   ) {
     this.createUserUseCase = createUserUseCase;
     this.listUsersUseCase = listUsersUseCase;
     this.updateUserUseCase = updateUserUseCase;
     this.deleteUserUseCase = deleteUserUseCase;
     this.getMeUseCase = getMeUseCase;
+    this.importUsersUseCase = importUsersUseCase;
   }
 
   async create(req, res) {
@@ -22,8 +24,16 @@ class UserController {
   }
 
   async list(req, res) {
-    const users = await this.listUsersUseCase.execute(req.user.church);
+    const users = await this.listUsersUseCase.execute(req.user.church, req.query);
     return res.json(users);
+  }
+
+  async import(req, res) {
+    const result = await this.importUsersUseCase.execute({
+      file: req.file,
+      church: req.user.church,
+    });
+    return res.status(201).json(result);
   }
 
   async me(req, res) {

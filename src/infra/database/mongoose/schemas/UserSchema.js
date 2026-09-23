@@ -5,12 +5,36 @@ const { ALLOWED_PERMISSIONS } = require("../../../../shared/config/permissions")
 const UserSchema = new mongoose.Schema({
   name: String,
   email: { type: String, unique: true },
+  phone: { type: String, default: "" },
+  birthDate: Date,
+  status: {
+    type: String,
+    enum: ["ACTIVE", "INACTIVE", "TRANSFERRED", "DISCIPLINE"],
+    default: "ACTIVE",
+  },
+  isLeader: { type: Boolean, default: false },
   church: String,
   password: { type: String, select: false },
   role: { type: String, enum: ALLOWED_ROLES, default: ROLES.MEMBRO },
   permissions: {
     type: [{ type: String, enum: ALLOWED_PERMISSIONS }],
     default: undefined,
+  },
+  profile: {
+    cpf: { type: String, default: "" },
+    address: { type: String, default: "" },
+    gender: { type: String, default: "" },
+    maritalStatus: { type: String, default: "" },
+    spouse: { type: String, default: "" },
+    children: { type: String, default: "" },
+    father: { type: String, default: "" },
+    mother: { type: String, default: "" },
+    baptized: { type: Boolean, default: false },
+    previousChurch: { type: String, default: "" },
+    previousPastor: { type: String, default: "" },
+    positions: { type: String, default: "" },
+    desiredFunction: { type: String, default: "" },
+    admissionType: { type: String, default: "" },
   },
 }, { timestamps: true });
 

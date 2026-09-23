@@ -20,9 +20,14 @@ function mapUser(user, { includePassword = false } = {}) {
     id: user._id,
     name: user.name,
     email: user.email,
+    phone: user.phone || "",
+    birthDate: user.birthDate || null,
+    status: user.status || "ACTIVE",
+    isLeader: Boolean(user.isLeader) || normalizeRole(user.role) === "Lider",
     church: user.church,
     role: normalizeRole(user.role),
     permissions: normalizePermissions(user.permissions, user.role),
+    profile: user.profile || {},
   };
 
   if (includePassword && user.password) {
@@ -56,8 +61,14 @@ class UserRepositoryMongo extends UserRepository {
     return mapUser(user, { includePassword: withPassword });
   }
 
-  async findAll(church) {
+  async findAll(church, { status, search } = {}) {
     const filter = church ? { church: exactInsensitive(church) } : {};
+    if (status) {
+      filter.status = status;
+    }
+    if (search) {
+      filter.name = new RegExp(escapeRegExp(search), "i");
+    }
     const users = await UserSchema.find(filter).select("-password");
     return users.map((user) => mapUser(user));
   }

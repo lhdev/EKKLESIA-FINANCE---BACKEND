@@ -8,9 +8,11 @@ const ListUsersUseCase = require("@application/usecases/ListUsersUseCase");
 const UpdateUserUseCase = require("@application/usecases/UpdateUserUseCase");
 const DeleteUserUseCase = require("@application/usecases/DeleteUserUseCase");
 const GetMeUseCase = require("@application/usecases/GetMeUseCase");
+const ImportUsersUseCase = require("@application/usecases/ImportUsersUseCase");
 
 const UserRepositoryMongo = require("@infra/database/mongoose/UserRepositoryMongo");
 const { ROLES } = require("@shared/config/roles");
+const { uploadUserImport } = require("../middlewares/upload.middleware");
 
 const UserController = require("../controllers/UserController");
 
@@ -23,13 +25,15 @@ const listUsersUC = new ListUsersUseCase(userRepository);
 const updateUserUC = new UpdateUserUseCase(userRepository);
 const deleteUserUC = new DeleteUserUseCase(userRepository);
 const getMeUC = new GetMeUseCase(userRepository);
+const importUsersUC = new ImportUsersUseCase(createUserUC);
 
 const userController = new UserController(
   createUserUC,
   listUsersUC,
   updateUserUC,
   deleteUserUC,
-  getMeUC
+  getMeUC,
+  importUsersUC
 );
 
 router.post("/", authMiddleware, roleMiddleware([ROLES.ADMIN]), (req, res) =>
@@ -38,6 +42,14 @@ router.post("/", authMiddleware, roleMiddleware([ROLES.ADMIN]), (req, res) =>
 
 router.get("/", authMiddleware, roleMiddleware([ROLES.ADMIN, ROLES.FINANCEIRO]), (req, res) =>
   userController.list(req, res)
+);
+
+router.post(
+  "/import",
+  authMiddleware,
+  roleMiddleware([ROLES.ADMIN]),
+  uploadUserImport.single("file"),
+  (req, res) => userController.import(req, res)
 );
 
 router.get("/me", authMiddleware, (req, res) => userController.me(req, res));
