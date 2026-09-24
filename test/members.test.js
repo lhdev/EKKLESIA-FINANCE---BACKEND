@@ -148,3 +148,60 @@ test("rejeita salvar perfil sem nome completo", async () => {
     (error) => error.statusCode === 400
   );
 });
+
+test("admin edita email e dados basicos de membro da propria igreja", async () => {
+  let updated;
+  const repository = {
+    findById: async () => ({
+      id: "member-2",
+      church: "adpv",
+      role: ROLES.MEMBRO,
+    }),
+    findByEmailAndChurch: async () => null,
+    update: async (_id, data) => {
+      updated = data;
+      return data;
+    },
+  };
+
+  await new UpdateUserUseCase(repository).execute({
+    id: "member-2",
+    requesterId: "admin-1",
+    requesterRole: ROLES.ADMIN,
+    requesterChurch: "adpv",
+    data: {
+      name: "Pessoa Editada",
+      email: "PESSOA.EDITADA@example.com",
+      phone: "(11) 90000-0000",
+      role: "Membro",
+      isLeader: false,
+    },
+  });
+
+  assert.equal(updated.email, "pessoa.editada@example.com");
+  assert.equal(updated.name, "Pessoa Editada");
+  assert.equal(updated.phone, "(11) 90000-0000");
+});
+
+test("admin nao pode trocar membro para email ja cadastrado", async () => {
+  const repository = {
+    findById: async () => ({
+      id: "member-2",
+      church: "adpv",
+      role: ROLES.MEMBRO,
+    }),
+    findByEmailAndChurch: async () => ({ id: "member-3" }),
+    update: async () => assert.fail("update nao deveria ser chamado"),
+  };
+
+  await assert.rejects(
+    () => new UpdateUserUseCase(repository).execute({
+      id: "member-2",
+      requesterId: "admin-1",
+      requesterRole: ROLES.ADMIN,
+      requesterChurch: "adpv",
+      data: { email: "existente@example.com" },
+    }),
+    (error) => error.statusCode === 400 && error.message === "Email ja cadastrado"
+  );
+});

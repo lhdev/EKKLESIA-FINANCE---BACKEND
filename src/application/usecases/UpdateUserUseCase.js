@@ -69,6 +69,21 @@ class UpdateUserUseCase {
       updateData.phone = String(requestedPhone).trim();
     }
 
+    if (isAdmin && data.email !== undefined) {
+      const normalizedEmail = String(data.email).trim().toLowerCase();
+      if (!normalizedEmail) {
+        throw new AppError("Email e obrigatorio", 400);
+      }
+      const emailOwner = await this.userRepository.findByEmailAndChurch(
+        normalizedEmail,
+        requesterChurch
+      );
+      if (emailOwner && String(emailOwner.id) !== String(id)) {
+        throw new AppError("Email ja cadastrado", 400);
+      }
+      updateData.email = normalizedEmail;
+    }
+
     const requestedBirthDate = firstDefined(data.birthDate, data.dataNascimento);
     if (requestedBirthDate !== undefined) {
       updateData.birthDate = requestedBirthDate || null;
