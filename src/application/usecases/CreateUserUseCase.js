@@ -2,6 +2,7 @@ const bcrypt = require("bcryptjs");
 const crypto = require("node:crypto");
 const AppError = require("../../shared/errors/AppError");
 const { normalizeRole } = require("../../shared/config/roles");
+const { validateChurch } = require("../../shared/config/churches");
 const {
   hasOnlyAllowedPermissions,
   normalizePermissions,
@@ -37,7 +38,7 @@ class CreateUserUseCase {
     }
 
     const normalizedEmail = email.trim().toLowerCase();
-    const normalizedChurch = typeof church === "string" ? church.trim() : church;
+    const normalizedChurch = validateChurch(church);
     const normalizedRole = normalizeRole(role);
 
     const exists = normalizedChurch

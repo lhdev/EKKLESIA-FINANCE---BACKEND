@@ -3,6 +3,7 @@ const jwt = require("jsonwebtoken");
 const AppError = require("../../shared/errors/AppError");
 const { normalizePermissions } = require("../../shared/config/permissions");
 const { normalizeRole } = require("../../shared/config/roles");
+const { validateChurch } = require("../../shared/config/churches");
 
 class LoginUserUseCase {
   constructor(userRepository) {
@@ -11,7 +12,10 @@ class LoginUserUseCase {
 
   async execute({ email, password, church }) {
     const normalizedEmail = email.trim().toLowerCase();
-    const normalizedChurch = typeof church === "string" ? church.trim() : church;
+    // Clientes legados podem omitir a igreja; nesse caso, validamos a da conta.
+    const normalizedChurch = church === undefined
+      ? undefined
+      : validateChurch(church);
 
     let user = null;
 
@@ -44,6 +48,8 @@ class LoginUserUseCase {
     if (!valid) {
       throw new AppError("Credenciais invalidas", 401);
     }
+
+    validateChurch(user.church || normalizedChurch);
 
     // Contas criadas antes da obrigatoriedade de igreja sao vinculadas
     // com seguranca somente depois da senha ter sido validada.

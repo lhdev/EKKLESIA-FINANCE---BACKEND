@@ -2,6 +2,7 @@ const jwt = require("jsonwebtoken");
 const AppError = require("../../../shared/errors/AppError");
 const { normalizeRole } = require("../../../shared/config/roles");
 const { normalizePermissions } = require("../../../shared/config/permissions");
+const { validateChurch } = require("../../../shared/config/churches");
 const UserSchema = require("../../database/mongoose/schemas/UserSchema");
 
 async function ensureAuthenticated(req, res, next) {
@@ -30,6 +31,8 @@ async function ensureAuthenticated(req, res, next) {
     if (!currentUser) {
       throw new AppError("Usuario nao encontrado", 401);
     }
+
+    validateChurch(currentUser.church, 403);
 
     const role = normalizeRole(currentUser.role);
     req.user = {

@@ -1,6 +1,7 @@
 const bcrypt = require("bcryptjs");
 const AppError = require("../../shared/errors/AppError");
 const { ROLES } = require("../../shared/config/roles");
+const { validateChurch } = require("../../shared/config/churches");
 
 class RegisterUserUseCase {
   constructor(userRepository) {
@@ -9,7 +10,7 @@ class RegisterUserUseCase {
 
   async execute({ name, email, church, password }) {
     const normalizedEmail = email.trim().toLowerCase();
-    const normalizedChurch = typeof church === "string" ? church.trim() : church;
+    const normalizedChurch = validateChurch(church);
 
     const userExists = normalizedChurch
       ? await this.userRepository.findByEmailAndChurch(normalizedEmail, normalizedChurch)
