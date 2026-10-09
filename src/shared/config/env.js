@@ -47,12 +47,30 @@ const env = {
   mongoUri: process.env.MONGO_URI?.trim() || '',
   jwtSecret: process.env.JWT_SECRET?.trim() || '',
   corsOrigins: parseCorsOrigins(process.env.CORS_ORIGINS),
-  trustProxy: /^\d+$/.test(process.env.TRUST_PROXY || '') ? Number(process.env.TRUST_PROXY) : (process.env.TRUST_PROXY?.trim() || 'loopback'),
+  trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
   jsonBodyLimit: process.env.JSON_BODY_LIMIT?.trim() || '1mb',
   cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME?.trim() || '',
   cloudinaryApiKey: process.env.CLOUDINARY_API_KEY?.trim() || '',
   cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET?.trim() || '',
 };
+function parseTrustProxy(value) {
+  const raw = (value ?? '').trim().toLowerCase();
+
+  if (!raw) return 'loopback';
+  if (raw === 'false') return false;
+
+  if (/^\d+$/.test(raw)) {
+    return Number(raw);
+  }
+
+  if (['loopback', 'linklocal', 'uniquelocal'].includes(raw)) {
+    return raw;
+  }
+
+  throw new Error(
+    'TRUST_PROXY invalido. Use false, um numero de saltos ou uma faixa confiavel.'
+  );
+}
 
 module.exports = {
   env,
