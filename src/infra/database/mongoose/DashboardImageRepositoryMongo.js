@@ -1,3 +1,10 @@
+const { validateChurch } = require('../../../shared/config/churches');
+function churchFilter(church) {
+  const normalized = validateChurch(church);
+  const scoped = { church: new RegExp(`^${normalized}$`, 'i') };
+  // Legacy unscoped gallery belongs exclusively to the original ADPV tenant.
+  return normalized.toLowerCase() === 'adpv' ? { $or: [scoped, { church: { $exists: false } }] } : scoped;
+}
 const DashboardImageSchema = require('./schemas/DashboardImageSchema');
 
 function mapImage(image) {
@@ -15,8 +22,8 @@ function mapImage(image) {
 }
 
 class DashboardImageRepositoryMongo {
-  async findAll() {
-    const images = await DashboardImageSchema.find().sort({ createdAt: -1 });
+  async findAll(church) {
+    const images = await DashboardImageSchema.find(churchFilter(church)).sort({ createdAt: -1 });
     return images.map(mapImage);
   }
 
@@ -32,8 +39,8 @@ class DashboardImageRepositoryMongo {
     return mapImage(updatedImage);
   }
 
-  async delete(id) {
-    const deletedImage = await DashboardImageSchema.findByIdAndDelete(id);
+  async delete(id, church) {
+    const deletedImage = await DashboardImageSchema.findOneAndDelete({ _id: id, ...churchFilter(church) });
     return mapImage(deletedImage);
   }
 }

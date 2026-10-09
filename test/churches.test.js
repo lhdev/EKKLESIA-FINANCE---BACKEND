@@ -28,7 +28,7 @@ for (const UseCase of [RegisterUserUseCase, CreateUserUseCase]) {
     });
     for (const church of [undefined, "", "Outra igreja"]) {
       await assert.rejects(
-        () => useCase.execute({ name: "Pessoa", email: "pessoa@example.com", password: "senha123", church }),
+        () => useCase.execute({ name: "Pessoa", email: "pessoa@example.com", password: "senha123-segura", church }),
         (error) => error.statusCode === 400
       );
     }
@@ -43,7 +43,7 @@ for (const UseCase of [RegisterUserUseCase, CreateUserUseCase]) {
       create: async (data) => data,
     });
     const result = await useCase.execute({
-      name: "Pessoa", email: "pessoa@example.com", password: "senha123", church: " ADPV ",
+      name: "Pessoa", email: "pessoa@example.com", password: "senha123-segura", church: " ADPV ",
     });
     assert.equal(result.church, "ADPV");
   });
@@ -56,7 +56,7 @@ test("login rejeita igreja nao autorizada antes do fallback de conta legada", as
     update: async () => assert.fail("Nao deve vincular igreja"),
   });
   await assert.rejects(
-    () => useCase.execute({ email: "pessoa@example.com", password: "senha123", church: "Outra" }),
+    () => useCase.execute({ email: "pessoa@example.com", password: "senha123-segura", church: "Outra" }),
     (error) => error.statusCode === 400 && error.message === "Igreja nao autorizada"
   );
 });

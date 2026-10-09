@@ -13,11 +13,13 @@ mongoose
   .then(() => {
     console.log('MongoDB conectado');
 
-    app.listen(env.port, env.host, () => {
+    const server = app.listen(env.port, env.host, () => {
       console.log(`Servidor rodando em http://${env.host}:${env.port}`);
     });
+    server.requestTimeout = 60000;
+    server.headersTimeout = 30000;
   })
   .catch((error) => {
-    console.error('Erro ao conectar no MongoDB:', error);
+    console.error('Erro ao conectar no MongoDB:', error.name);
     process.exit(1);
   });

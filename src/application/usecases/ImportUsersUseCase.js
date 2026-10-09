@@ -1,3 +1,5 @@
+const { validateXlsx } = require('../../shared/security/xlsx');
+const input = require('../../shared/security/input');
 const path = require("node:path");
 const readXlsxFile = require("read-excel-file/node");
 
@@ -105,10 +107,9 @@ function dateValue(value) {
   const text = String(value).trim();
   const brazilian = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (brazilian) {
-    return new Date(`${brazilian[3]}-${brazilian[2].padStart(2, "0")}-${brazilian[1].padStart(2, "0")}T00:00:00.000Z`);
+    return input.date(`${brazilian[3]}-${brazilian[2].padStart(2, "0")}-${brazilian[1].padStart(2, "0")}T00:00:00.000Z`);
   }
-  const parsed = new Date(text);
-  return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+  return input.date(text);
 }
 
 function rowsToUsers(rows) {
@@ -160,18 +161,23 @@ class ImportUsersUseCase {
     }
 
     const extension = path.extname(file.originalname || "").toLowerCase();
+    if (!['.csv', '.xlsx'].includes(extension) || file.buffer.length > 5 * 1024 * 1024) {
+      throw new AppError('Arquivo deve ser CSV ou XLSX com no maximo 5 MB', 400);
+    }
+    if (extension === '.xlsx') await validateXlsx(file.buffer);
     const rows = extension === ".xlsx"
       ? await readXlsxFile(file.buffer)
       : parseCsv(file.buffer);
     const users = rowsToUsers(rows);
-    const createdUsers = [];
-
+    const seen = new Set();
     for (const user of users) {
-      createdUsers.push(await this.createUserUseCase.execute({
-        ...user,
-        church,
-      }));
+      const normalizedEmail = input.email(user.email);
+      if (seen.has(normalizedEmail)) throw new AppError('Email duplicado na importacao', 400);
+      seen.add(normalizedEmail);
     }
+    const prepared = [];
+    for (const user of users) prepared.push(await this.createUserUseCase.prepare({ ...user, church }));
+    const createdUsers = await this.createUserUseCase.userRepository.createMany(prepared);
 
     return {
       imported: createdUsers.length,

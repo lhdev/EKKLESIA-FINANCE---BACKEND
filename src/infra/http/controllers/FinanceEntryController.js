@@ -1,3 +1,5 @@
+const crypto = require('node:crypto');
+const { validateMedia } = require('../../../shared/security/files');
 class FinanceEntryController {
   constructor(useCase, mediaStorage) {
     this.useCase = useCase;
@@ -18,10 +20,12 @@ class FinanceEntryController {
 
     try {
       if (req.file) {
+        validateMedia(req.file, { allowPdf: true });
         uploadedFile = await this.mediaStorage.upload({
           bytes: req.file.buffer,
           fileName: req.file.originalname,
-          folder: "ekklesia/finance-receipts",
+          folder: `ekklesia/finance-receipts/${crypto.createHash("sha256").update(req.user.church.toLowerCase()).digest("hex").slice(0, 16)}/${req.user.id}`,
+          deliveryType: "authenticated",
         });
       }
 
@@ -32,6 +36,8 @@ class FinanceEntryController {
         data: {
           ...req.body,
           receiptUrl: uploadedFile?.url || "",
+          receiptDeliveryType: uploadedFile?.deliveryType || "upload",
+          receiptFormat: uploadedFile?.format || "",
           receiptFileName: req.file?.originalname || "",
           receiptStorageId: uploadedFile?.publicId || "",
           receiptResourceType: uploadedFile?.resourceType || "auto",
@@ -43,6 +49,7 @@ class FinanceEntryController {
         await this.mediaStorage.delete({
           publicId: uploadedFile.publicId,
           resourceType: uploadedFile.resourceType,
+          deliveryType: uploadedFile.deliveryType,
         }).catch(() => null);
       }
       throw error;

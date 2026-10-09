@@ -1,27 +1,18 @@
 const multer = require('multer');
-const AppError = require("../../../shared/errors/AppError");
-
+const crypto = require('node:crypto');
+const AppError = require('../../../shared/errors/AppError');
 function errorMiddleware(error, req, res, next) {
-  if (error instanceof AppError) {
-    return res.status(error.statusCode).json({ message: error.message });
+  if (res.headersSent) return next(error);
+  if (error instanceof AppError) return res.status(error.statusCode).json({ message: error.message });
+  if (error instanceof multer.MulterError) return res.status(error.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({ message: 'Arquivo ou formulario excede os limites permitidos.' });
+  if (error.code === 11000) return res.status(409).json({ message: 'Registro ja existe.' });
+  if (['ValidationError', 'CastError'].includes(error.name) || error.type === 'entity.parse.failed') {
+    return res.status(400).json({ message: 'Dados invalidos.' });
   }
-
-  if (error instanceof multer.MulterError) {
-    if (error.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({
-        message: 'O arquivo excede o limite permitido de 10MB.',
-      });
-    }
-
-    return res.status(400).json({ message: error.message });
-  }
-
-  if (error instanceof Error) {
-    return res.status(400).json({ message: error.message });
-  }
-
-  console.error(error);
-  return res.status(500).json({ message: "Erro interno do servidor" });
+  if (error.type === 'entity.too.large') return res.status(413).json({ message: 'Requisicao excede o limite permitido.' });
+  const errorId = crypto.randomUUID();
+  // No raw error, headers, body, URLs or credentials in logs.
+  console.error(JSON.stringify({ errorId, errorType: error.name || 'Error', method: req.method }));
+  return res.status(500).json({ message: 'Erro interno do servidor', errorId });
 }
-
 module.exports = errorMiddleware;

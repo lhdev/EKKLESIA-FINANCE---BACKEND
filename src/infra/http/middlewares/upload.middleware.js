@@ -1,11 +1,12 @@
 const multer = require('multer');
+const AppError = require('../../../shared/errors/AppError');
 
 function imageFileFilter(_request, file, callback) {
-  const isImage = file.mimetype.startsWith('image/');
+  const isImage = ['image/jpeg', 'image/png'].includes(file.mimetype);
   const isPdf = file.mimetype == 'application/pdf';
 
   if (!isImage && !isPdf) {
-    callback(new Error('Apenas arquivos JPG, JPEG, PNG e PDF sao permitidos'));
+    callback(new AppError('Apenas arquivos JPG, JPEG, PNG e PDF sao permitidos', 400));
     return;
   }
 
@@ -17,6 +18,7 @@ const uploadDashboardImage = multer({
   fileFilter: imageFileFilter,
   limits: {
     fileSize: 10 * 1024 * 1024,
+    files: 1, fields: 12, parts: 13, fieldSize: 4096,
   },
 });
 
@@ -25,6 +27,7 @@ const uploadFinanceReceipt = multer({
   fileFilter: imageFileFilter,
   limits: {
     fileSize: 10 * 1024 * 1024,
+    files: 1, fields: 12, parts: 13, fieldSize: 4096,
   },
 });
 
@@ -33,7 +36,7 @@ function userImportFileFilter(_request, file, callback) {
   const isSupported = fileName.endsWith('.csv') || fileName.endsWith('.xlsx');
 
   if (!isSupported) {
-    callback(new Error('Apenas arquivos CSV e XLSX sao permitidos'));
+    callback(new AppError('Apenas arquivos CSV e XLSX sao permitidos', 400));
     return;
   }
 
@@ -45,6 +48,7 @@ const uploadUserImport = multer({
   fileFilter: userImportFileFilter,
   limits: {
     fileSize: 5 * 1024 * 1024,
+    files: 1, fields: 0, parts: 1,
   },
 });
 

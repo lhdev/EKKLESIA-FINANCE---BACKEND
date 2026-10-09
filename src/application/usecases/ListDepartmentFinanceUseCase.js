@@ -1,3 +1,5 @@
+const input = require('../../shared/security/input');
+const { financeSummary } = require("../../shared/security/finance");
 const UserSchema = require("../../infra/database/mongoose/schemas/UserSchema");
 const {
   FinanceEntry,
@@ -17,7 +19,7 @@ class ListDepartmentFinanceUseCase {
       throw new AppError("Usuario sem igreja vinculada", 400);
     }
 
-    const users = await this.userModel.find({ church: church.trim() })
+    const users = await this.userModel.find({ church: input.churchPattern(church) })
       .select("name role")
       .lean();
     const leaders = users.filter(
@@ -26,7 +28,7 @@ class ListDepartmentFinanceUseCase {
     const leaderIds = leaders.map((leader) => leader._id);
     const entries = leaderIds.length
       ? await this.entryModel
-          .find({ church: church.trim(), createdBy: { $in: leaderIds } })
+          .find({ church: input.churchPattern(church), createdBy: { $in: leaderIds } })
           .sort({ occurredAt: -1, createdAt: -1 })
           .lean()
       : [];
@@ -42,19 +44,7 @@ class ListDepartmentFinanceUseCase {
     const departments = leaders
       .map((leader) => {
         const leaderEntries = entriesByLeader.get(String(leader._id)) || [];
-        const totals = leaderEntries.reduce(
-          (summary, entry) => {
-            if (entry.type === FINANCE_ENTRY_TYPES.CONTRIBUTION) {
-              summary.contributionsCents += entry.amountCents;
-              summary.balanceCents += entry.amountCents;
-            } else {
-              summary.expensesCents += entry.amountCents;
-              summary.balanceCents -= entry.amountCents;
-            }
-            return summary;
-          },
-          { contributionsCents: 0, expensesCents: 0, balanceCents: 0 }
-        );
+        const totals = financeSummary(leaderEntries);
 
         return {
           leaderId: leader._id,
@@ -65,15 +55,7 @@ class ListDepartmentFinanceUseCase {
       })
       .sort((first, second) => first.name.localeCompare(second.name, "pt-BR"));
 
-    const summary = departments.reduce(
-      (total, department) => ({
-        contributionsCents:
-          total.contributionsCents + department.contributionsCents,
-        expensesCents: total.expensesCents + department.expensesCents,
-        balanceCents: total.balanceCents + department.balanceCents,
-      }),
-      { contributionsCents: 0, expensesCents: 0, balanceCents: 0 }
-    );
+    const summary = financeSummary(entries);
 
     return { departments, summary };
   }

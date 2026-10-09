@@ -1,4 +1,5 @@
 const bcrypt = require("bcryptjs");
+const input = require('../../shared/security/input');
 const jwt = require("jsonwebtoken");
 const AppError = require("../../shared/errors/AppError");
 const { normalizePermissions } = require("../../shared/config/permissions");
@@ -11,7 +12,10 @@ class LoginUserUseCase {
   }
 
   async execute({ email, password, church }) {
-    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedEmail = input.email(email);
+    if (typeof password !== 'string' || !password || Buffer.byteLength(password) > 72) {
+      throw new AppError('Credenciais invalidas', 401);
+    }
     // Clientes legados podem omitir a igreja; nesse caso, validamos a da conta.
     const normalizedChurch = church === undefined
       ? undefined
@@ -44,6 +48,9 @@ class LoginUserUseCase {
       throw new AppError("Credenciais invalidas", 401);
     }
 
+    if (user.authEnabled === false || typeof user.password !== 'string') {
+      throw new AppError('Credenciais invalidas', 401);
+    }
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) {
       throw new AppError("Credenciais invalidas", 401);
@@ -62,9 +69,9 @@ class LoginUserUseCase {
     const permissions = normalizePermissions(user.permissions, role);
 
     const token = jwt.sign(
-      { id: user.id, church: user.church, role, permissions },
+      { id: user.id, church: user.church, authVersion: user.authVersion || 0 },
       process.env.JWT_SECRET,
-      { expiresIn: "1d" }
+      { expiresIn: "1d", algorithm: "HS256" }
     );
 
     return {

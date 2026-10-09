@@ -1,3 +1,6 @@
+const permissionMiddleware = require('../middlewares/permission.middleware');
+const { PERMISSIONS } = require('../../../shared/config/permissions');
+const { uploadLimiter } = require("../middlewares/rate-limit.middleware");
 const express = require("express");
 
 const authMiddleware = require("../middlewares/auth.middleware");
@@ -40,7 +43,7 @@ router.post("/", authMiddleware, roleMiddleware([ROLES.ADMIN]), (req, res) =>
   userController.create(req, res)
 );
 
-router.get("/", authMiddleware, roleMiddleware([ROLES.ADMIN, ROLES.FINANCEIRO]), (req, res) =>
+router.get("/", authMiddleware, roleMiddleware([ROLES.ADMIN, ROLES.FINANCEIRO]), permissionMiddleware(PERMISSIONS.USERS_VIEW), (req, res) =>
   userController.list(req, res)
 );
 
@@ -48,6 +51,7 @@ router.post(
   "/import",
   authMiddleware,
   roleMiddleware([ROLES.ADMIN]),
+  uploadLimiter,
   uploadUserImport.single("file"),
   (req, res) => userController.import(req, res)
 );

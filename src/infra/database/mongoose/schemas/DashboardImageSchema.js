@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const DashboardImageSchema = new mongoose.Schema(
   {
+    church: { type: String, required: true, trim: true, index: true },
     imageUrl: { type: String, required: true, trim: true },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,

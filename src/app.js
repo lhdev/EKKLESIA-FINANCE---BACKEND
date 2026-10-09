@@ -1,12 +1,15 @@
 const express = require('express');
 const path = require('path');
 const cors = require('cors');
+const helmet = require('helmet');
+const mongoose = require('mongoose');
+const AppError = require('./shared/errors/AppError');
 
 const routes = require('./infra/http/routes');
 const errorMiddleware = require('./infra/http/middlewares/error.middleware');
 const { env } = require('./shared/config/env');
 
-require('dotenv').config();
+
 
 const app = express();
 
@@ -26,7 +29,7 @@ function buildCorsOptions() {
         return;
       }
 
-      callback(new Error('Origin not allowed by CORS'));
+      callback(new AppError('Origem nao permitida', 403));
     },
     credentials: true,
     optionsSuccessStatus: 204,
@@ -36,9 +39,16 @@ function buildCorsOptions() {
 app.disable('x-powered-by');
 app.set('trust proxy', env.trustProxy);
 
+app.use(helmet());
+app.use((_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
 app.use(express.json({ limit: env.jsonBodyLimit }));
 app.use(cors(buildCorsOptions()));
-app.use('/uploads', express.static(path.resolve(__dirname, '..', 'uploads')));
+// Legacy public gallery files only; financial receipts are stored separately.
+app.get('/uploads/:filename', (req, res, next) => {
+  if (!/^[\w .-]+\.(?:jpe?g|png)$/i.test(req.params.filename)) return next(new AppError('Arquivo nao encontrado', 404));
+  res.sendFile(req.params.filename, { root: path.resolve(__dirname, '..', 'uploads'), dotfiles: 'deny' });
+});
+app.get('/ready', (_req, res) => res.status(mongoose.connection.readyState === 1 ? 200 : 503).json({ status: mongoose.connection.readyState === 1 ? 'ready' : 'unavailable' }));
 
 app.get('/health', (_request, response) => {
   response.status(200).json({

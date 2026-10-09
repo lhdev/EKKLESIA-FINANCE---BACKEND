@@ -16,6 +16,8 @@ const UserSchema = new mongoose.Schema({
   photoUrl: { type: String, default: "" },
   church: String,
   password: { type: String, select: false },
+  authVersion: { type: Number, default: 0, min: 0 },
+  authEnabled: { type: Boolean, default: true },
   role: { type: String, enum: ALLOWED_ROLES, default: ROLES.MEMBRO },
   permissions: {
     type: [{ type: String, enum: ALLOWED_PERMISSIONS }],

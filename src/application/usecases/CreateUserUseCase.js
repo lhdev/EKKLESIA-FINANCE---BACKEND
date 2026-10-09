@@ -1,4 +1,5 @@
 const bcrypt = require("bcryptjs");
+const input = require('../../shared/security/input');
 const crypto = require("node:crypto");
 const AppError = require("../../shared/errors/AppError");
 const { normalizeRole } = require("../../shared/config/roles");
@@ -14,6 +15,10 @@ class CreateUserUseCase {
   }
 
   async execute(data) {
+    return this.userRepository.create(await this.prepare(data));
+  }
+
+  async prepare(data) {
     const name = data.name || data.nomeCompleto;
     const email = data.email;
     const church = data.church;
@@ -29,7 +34,7 @@ class CreateUserUseCase {
     const password = data.password ||
       (isMemberRecord ? crypto.randomBytes(24).toString("hex") : "");
 
-    if (!name?.trim() || !email?.trim() || !password) {
+    if (typeof name !== "string" || !name.trim() || typeof email !== "string" || !email.trim() || !password) {
       throw new AppError("Nome, email e senha sao obrigatorios", 400);
     }
 
@@ -37,9 +42,11 @@ class CreateUserUseCase {
       throw new AppError("Permissoes invalidas", 400);
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
+    input.text(name, 'Nome', { min: 1, max: 150 });
+    input.password(password);
+    const normalizedEmail = input.email(email);
     const normalizedChurch = validateChurch(church);
-    const normalizedRole = normalizeRole(role);
+    const normalizedRole = input.role(role);
 
     const exists = normalizedChurch
       ? await this.userRepository.findByEmailAndChurch(normalizedEmail, normalizedChurch)
@@ -49,9 +56,9 @@ class CreateUserUseCase {
       throw new AppError("Usuario ja existe", 400);
     }
 
-    const hashedPassword = await bcrypt.hash(password, 8);
+    const hashedPassword = await bcrypt.hash(password, 12);
 
-    const normalizedStatus = String(data.status || data.situacao || "ACTIVE")
+    const normalizedStatus = String(input.status(data.status || data.situacao || "ACTIVE"))
       .trim()
       .toUpperCase();
     const allowedStatuses = ["ACTIVE", "INACTIVE", "TRANSFERRED", "DISCIPLINE"];
@@ -69,14 +76,14 @@ class CreateUserUseCase {
           .filter((child) => child.name)
       : [];
 
-    return this.userRepository.create({
+    return {
       name: name.trim(),
       email: normalizedEmail,
       phone: String(data.phone || data.telefone1 || "").trim(),
-      birthDate: data.birthDate || data.dataNascimento || undefined,
+      birthDate: data.birthDate || data.dataNascimento ? input.date(data.birthDate || data.dataNascimento) : undefined,
       status: normalizedStatus,
       isLeader: data.isLeader === true || normalizeRole(role) === "Lider",
-      photoUrl: String(data.photoUrl || data.fotoUrl || "").trim(),
+      photoUrl: input.photo(data.photoUrl || data.fotoUrl || ""),
       church: normalizedChurch,
       password: hashedPassword,
       role: normalizedRole,
@@ -106,7 +113,7 @@ class CreateUserUseCase {
         admissionType: data.admissionType || data.tipoAdesao || "",
         newConvert: data.newConvert === true || data.novoConvertido === true,
       },
-    });
+    };
   }
 }
 

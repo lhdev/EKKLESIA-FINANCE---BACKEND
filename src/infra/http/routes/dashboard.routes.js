@@ -1,3 +1,6 @@
+const permissionMiddleware = require('../middlewares/permission.middleware');
+const { PERMISSIONS } = require('../../../shared/config/permissions');
+const { uploadLimiter } = require("../middlewares/rate-limit.middleware");
 const express = require('express');
 
 const authMiddleware = require('../middlewares/auth.middleware');
@@ -46,6 +49,7 @@ router.post(
   '/images',
   authMiddleware,
   roleMiddleware([ROLES.MIDIA]),
+  permissionMiddleware(PERMISSIONS.MEDIA_VIEW),
   (req, res) => dashboardImageController.create(req, res)
 );
 
@@ -53,6 +57,8 @@ router.post(
   '/images/upload',
   authMiddleware,
   roleMiddleware([ROLES.MIDIA]),
+  permissionMiddleware(PERMISSIONS.MEDIA_VIEW),
+  uploadLimiter,
   uploadDashboardImage.single('image'),
   (req, res) => dashboardImageController.upload(req, res)
 );
@@ -61,6 +67,7 @@ router.delete(
   '/images/:id',
   authMiddleware,
   roleMiddleware([ROLES.MIDIA]),
+  permissionMiddleware(PERMISSIONS.MEDIA_VIEW),
   (req, res) => dashboardImageController.delete(req, res)
 );
 

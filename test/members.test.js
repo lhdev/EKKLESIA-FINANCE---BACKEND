@@ -37,11 +37,12 @@ test("cria cadastro de membro sem senha informada pelo painel", async () => {
 test("importa membros de CSV com separador brasileiro", async () => {
   const received = [];
   const createUserUseCase = {
-    execute: async (data) => {
+    prepare: async (data) => {
       received.push(data);
       return { id: `member-${received.length}`, ...data };
     },
   };
+  createUserUseCase.userRepository = { createMany: async data => data };
   const csv = [
     "Nome completo;E-mail;Telefone;Data de nascimento;Lider;Status",
     "Joao Souza;joao@example.com;11911112222;15/03/1985;sim;ACTIVE",
