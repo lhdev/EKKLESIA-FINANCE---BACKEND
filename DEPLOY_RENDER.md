@@ -75,9 +75,13 @@ Conferir as configurações antes do merge. O teste local não valida os provedo
 ## Recuperação
 
 Guardar o SHA anterior e o novo. Rollback do Render restaura código, mas não desfaz
-gravações em MongoDB/Cloudinary e não restaura automaticamente todas as configurações.
+gravações em MongoDB/Cloudinary. Pode reutilizar variáveis individuais do deploy antigo,
+incluindo credenciais expostas; não executar rollback antigo sem revisar esse efeito.
 Não restaurar chaves expostas. Voltar ao commit antigo reintroduz falhas de segurança;
-considerar uma correção compatível quando possível.
+preparar uma versão compatível sem .env e com os segredos novos para deploy normal.
+
+Para o cenário Atlas Free, seguir o [guia detalhado](GUIA_DEPLOY_SEM_PERDA.md), incluindo
+restauração de teste, bloqueio de escrita e preservação dos arquivos.
 
 Retirar .env do último commit não revoga segredos nem limpa o histórico. O saneamento
 do histórico remoto exige coordenação e não foi executado. Não reescrever o histórico

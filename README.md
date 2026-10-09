@@ -13,7 +13,8 @@ Em desenvolvimento, configurar o .env local a partir de .env.example; `npm run d
 usa o watcher nativo do Node. Em produção, os segredos ficam no Environment do Render.
 Não versionar .env, banco, uploads ou node_modules.
 
-Leia [DEPLOY_RENDER.md](DEPLOY_RENDER.md) antes da promoção e
+Leia o [guia passo a passo para Atlas Free](GUIA_DEPLOY_SEM_PERDA.md) e
+[DEPLOY_RENDER.md](DEPLOY_RENDER.md) antes da promoção e
 [SECURITY_CHANGES.md](SECURITY_CHANGES.md) para mudanças, evidências e pendências.
 
 `GET /health` verifica o processo; `GET /ready` exige conexão MongoDB ativa.
