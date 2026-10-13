@@ -2,7 +2,7 @@ const AppError = require("../errors/AppError");
 
 // Adicione manualmente novas igrejas autorizadas nesta lista.
 const ALLOWED_CHURCHES = Object.freeze([
-  "Adpv",
+  "Adpv","Rosa de Saron"
 ]);
 
 function isAllowedChurch(church) {
