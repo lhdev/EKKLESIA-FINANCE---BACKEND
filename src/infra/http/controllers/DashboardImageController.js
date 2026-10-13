@@ -1,3 +1,4 @@
+const { validateMedia } = require('../../../shared/security/files');
 const fs = require('fs/promises');
 const path = require('path');
 const { env } = require('../../../shared/config/env');
@@ -22,7 +23,7 @@ class DashboardImageController {
   }
 
   async list(req, res) {
-    const images = await this.listDashboardImagesUseCase.execute();
+    const images = await this.listDashboardImagesUseCase.execute(req.user.church);
     const normalizedImages = await Promise.all(
       images.map((image) => this.#normalizeImage(image, req))
     );
@@ -33,6 +34,7 @@ class DashboardImageController {
     const image = await this.createDashboardImageUseCase.execute({
       imageUrl: req.body.imageUrl,
       createdBy: req.user.id,
+      church: req.user.church,
     });
 
     return res.status(201).json(await this.#normalizeImage(image, req));
@@ -43,6 +45,7 @@ class DashboardImageController {
       return res.status(400).json({ message: 'Arquivo de imagem nao enviado' });
     }
 
+    validateMedia(req.file);
     const uploadedFile = await this.mediaStorage.upload({
       bytes: req.file.buffer,
       fileName: req.file.originalname,
@@ -56,18 +59,24 @@ class DashboardImageController {
         resourceType: uploadedFile.resourceType,
       });
     
-    const image = await this.createDashboardImageUseCase.execute({
-      imageUrl: resolvedImageUrl,
-      createdBy: req.user.id,
-      storageId: uploadedFile.publicId,
-      resourceType: uploadedFile.resourceType,
-    });
+    try {
+      const image = await this.createDashboardImageUseCase.execute({
+        imageUrl: resolvedImageUrl,
+        createdBy: req.user.id,
+        church: req.user.church,
+        storageId: uploadedFile.publicId,
+        resourceType: uploadedFile.resourceType,
+      });
 
-    return res.status(201).json(await this.#normalizeImage(image, req));
+      return res.status(201).json(await this.#normalizeImage(image, req));
+    } catch (error) {
+      await this.mediaStorage.delete({ publicId: uploadedFile.publicId, resourceType: uploadedFile.resourceType }).catch(() => null);
+      throw error;
+    }
   }
 
   async delete(req, res) {
-    const deletedImage = await this.deleteDashboardImageUseCase.execute(req.params.id);
+    const deletedImage = await this.deleteDashboardImageUseCase.execute(req.params.id, req.user.church);
 
     await this.#deleteStoredMedia(deletedImage);
 
@@ -103,11 +112,11 @@ class DashboardImageController {
       return legacyCloudinaryUrl;
     }
 
-    return rawImageUrl;
+    return '';
   }
 
   async #normalizeImage(image, req) {
-    const migratedImage = await this.#migrateLocalImage(image);
+    const migratedImage = image;
     const imageUrl = this.#resolveImageUrl(migratedImage, req);
 
     return {
@@ -117,52 +126,8 @@ class DashboardImageController {
     };
   }
 
-  async #migrateLocalImage(image) {
-    if (!image || image.storageId) {
-      return image;
-    }
-
-    const rawImageUrl = image.imageUrl?.trim();
-    if (!rawImageUrl || !this.#isLocalUploadPath(rawImageUrl)) {
-      return image;
-    }
-
-    const localFilePath = this.#resolveLocalUploadFilePath(rawImageUrl);
-    if (!localFilePath) {
-      return image;
-    }
-
-    const fileBuffer = await fs.readFile(localFilePath).catch(() => null);
-    if (!fileBuffer) {
-      return image;
-    }
-
-    try {
-      const uploadedFile = await this.mediaStorage.upload({
-        bytes: fileBuffer,
-        fileName: path.basename(localFilePath),
-        folder: DASHBOARD_MEDIA_FOLDER,
-      });
-
-      const resolvedUrl =
-        uploadedFile.url ||
-        this.mediaStorage.buildUrl({
-          publicId: uploadedFile.publicId,
-          resourceType: uploadedFile.resourceType,
-        });
-
-      return await this.updateDashboardImageUseCase.execute(image.id, {
-        imageUrl: resolvedUrl,
-        storageId: uploadedFile.publicId,
-        resourceType: uploadedFile.resourceType,
-      });
-    } catch {
-      return image;
-    }
-  }
-
   #isAbsoluteUrl(rawImageUrl) {
-    return rawImageUrl.startsWith('http://') || rawImageUrl.startsWith('https://');
+    try { const url = new URL(rawImageUrl); return url.protocol === 'https:' && !url.username && !url.password; } catch (_) { return false; }
   }
 
   #isLocalUploadPath(rawImageUrl) {
@@ -178,15 +143,7 @@ class DashboardImageController {
       ? rawImageUrl
       : `/${rawImageUrl}`;
 
-    const host = req?.get?.('host') || (env.host === '0.0.0.0' ? `localhost:${env.port}` : env.host);
-    if (!host) {
-      return normalizedPath;
-    }
-
-    const forwardedProtocol = req.get('x-forwarded-proto')?.split(',')[0]?.trim();
-    const protocol = forwardedProtocol || req.protocol || 'http';
-
-    return `${protocol}://${host}${normalizedPath}`;
+    return `${env.publicApiUrl}${normalizedPath}`;
   }
 
   async #deleteStoredMedia(image) {

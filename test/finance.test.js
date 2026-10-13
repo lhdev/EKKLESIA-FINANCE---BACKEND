@@ -36,6 +36,7 @@ test("saldo soma contribuicoes e subtrai despesas", async () => {
         {
           _id: "entry-1",
           type: FINANCE_ENTRY_TYPES.CONTRIBUTION,
+          status: "CONFIRMADO",
           amountCents: 15000,
           occurredAt: new Date("2026-09-01"),
           description: "Contribuicao",
@@ -43,6 +44,7 @@ test("saldo soma contribuicoes e subtrai despesas", async () => {
         {
           _id: "entry-2",
           type: FINANCE_ENTRY_TYPES.EXPENSE,
+          status: "CONFIRMADO",
           amountCents: 4000,
           occurredAt: new Date("2026-09-01"),
           description: "Despesa",
@@ -61,6 +63,8 @@ test("saldo soma contribuicoes e subtrai despesas", async () => {
       contributionsCents: 15000,
       expensesCents: 4000,
       balanceCents: 11000,
+      pendingContributionsCents: 0,
+      pendingExpensesCents: 0,
     });
   } finally {
     FinanceEntry.find = originalFind;
@@ -82,7 +86,7 @@ test("lider consulta somente os proprios lancamentos", async () => {
       role: ROLES.LIDER,
     });
     assert.deepEqual(receivedFilter, {
-      church: "Igreja A",
+      church: /^Igreja A$/i,
       createdBy: "leader-1",
     });
   } finally {
@@ -105,7 +109,7 @@ test("membro consulta somente os proprios lancamentos", async () => {
       role: ROLES.MEMBRO,
     });
     assert.deepEqual(receivedFilter, {
-      church: "Igreja A",
+      church: /^Igreja A$/i,
       createdBy: "member-1",
     });
   } finally {
@@ -127,7 +131,7 @@ test("financeiro consulta todos os lancamentos da igreja", async () => {
       userId: "finance-1",
       role: ROLES.FINANCEIRO,
     });
-    assert.deepEqual(receivedFilter, { church: "Igreja A" });
+    assert.deepEqual(receivedFilter, { church: /^Igreja A$/i });
   } finally {
     FinanceEntry.find = originalFind;
   }
@@ -148,16 +152,19 @@ test("consolida saldos e despesas por departamento", async () => {
           {
             createdBy: "leader-a",
             type: FINANCE_ENTRY_TYPES.CONTRIBUTION,
+          status: "CONFIRMADO",
             amountCents: 10000,
           },
           {
             createdBy: "leader-a",
             type: FINANCE_ENTRY_TYPES.EXPENSE,
+          status: "CONFIRMADO",
             amountCents: 2000,
           },
           {
             createdBy: "leader-b",
             type: FINANCE_ENTRY_TYPES.EXPENSE,
+          status: "CONFIRMADO",
             amountCents: 1000,
           },
         ],
@@ -174,6 +181,8 @@ test("consolida saldos e despesas por departamento", async () => {
     contributionsCents: 10000,
     expensesCents: 3000,
     balanceCents: 7000,
+    pendingContributionsCents: 0,
+    pendingExpensesCents: 0,
   });
   assert.equal(result.departments[0].name, "Irmãs");
   assert.equal(result.departments[0].expensesCents, 1000);
@@ -339,7 +348,7 @@ test("admin cadastra usuario com permissoes individuais", async () => {
     name: "Pessoa Financeira",
     email: "PESSOA@example.com",
     church: "adpv",
-    password: "senha123",
+    password: "senha123-segura",
     role: ROLES.MEMBRO,
     permissions: [PERMISSIONS.FINANCE_VIEW, PERMISSIONS.DEPARTMENTS_VIEW],
   });
@@ -393,11 +402,11 @@ test("admin redefine a senha de usuario da propria igreja", async () => {
     requesterId: "admin-1",
     requesterRole: ROLES.ADMIN,
     requesterChurch: "adpv",
-    data: { password: "nova-senha" },
+    data: { password: "nova-senha-segura" },
   });
 
-  assert.notEqual(updatedData.password, "nova-senha");
-  assert.equal(await bcrypt.compare("nova-senha", updatedData.password), true);
+  assert.notEqual(updatedData.password, "nova-senha-segura");
+  assert.equal(await bcrypt.compare("nova-senha-segura", updatedData.password), true);
 });
 
 test("rejeita redefinicao com senha muito curta", async () => {

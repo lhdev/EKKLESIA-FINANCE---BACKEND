@@ -1,29 +1,13 @@
-const AppError = require("../errors/AppError");
+const ChurchPolicy = require("../../domain/services/ChurchPolicy");
 
 // Adicione manualmente novas igrejas autorizadas nesta lista.
 const ALLOWED_CHURCHES = Object.freeze([
   "Adpv",
+  "Rosa de Saron",
 ]);
 
-function isAllowedChurch(church) {
-  if (typeof church !== "string" || !church.trim()) return false;
+const churchPolicy = new ChurchPolicy(ALLOWED_CHURCHES);
+const isAllowedChurch = churchPolicy.isAllowedChurch.bind(churchPolicy);
+const validateChurch = churchPolicy.validateChurch.bind(churchPolicy);
 
-  const normalizedChurch = church.trim().toLowerCase();
-  return ALLOWED_CHURCHES.some(
-    (allowedChurch) => allowedChurch.trim().toLowerCase() === normalizedChurch
-  );
-}
-
-function validateChurch(church, statusCode = 400) {
-  if (typeof church !== "string" || !church.trim()) {
-    throw new AppError("Igreja obrigatoria", statusCode);
-  }
-
-  if (!isAllowedChurch(church)) {
-    throw new AppError("Igreja nao autorizada", statusCode);
-  }
-
-  return church.trim();
-}
-
-module.exports = { ALLOWED_CHURCHES, isAllowedChurch, validateChurch };
+module.exports = { ALLOWED_CHURCHES, churchPolicy, isAllowedChurch, validateChurch };

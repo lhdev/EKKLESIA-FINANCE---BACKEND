@@ -1,3 +1,6 @@
+const roleMiddleware = require("../middlewares/role.middleware");
+const { ROLES } = require("../../../shared/config/roles");
+const { uploadLimiter } = require("../middlewares/rate-limit.middleware");
 const express = require("express");
 const authMiddleware = require("../middlewares/auth.middleware");
 const permissionMiddleware = require("../middlewares/permission.middleware");
@@ -17,7 +20,7 @@ const controller = new FinanceEntryController(
 const departmentController = new DepartmentFinanceController(
   new ListDepartmentFinanceUseCase()
 );
-router.use(authMiddleware);
+router.use(authMiddleware, roleMiddleware([ROLES.ADMIN, ROLES.FINANCEIRO, ROLES.LIDER, ROLES.MEMBRO]));
 router.get(
   "/entries",
   permissionMiddleware(PERMISSIONS.FINANCE_VIEW),
@@ -26,6 +29,7 @@ router.get(
 router.post(
   "/entries",
   permissionMiddleware(PERMISSIONS.FINANCE_VIEW),
+  uploadLimiter,
   uploadFinanceReceipt.single("receipt"),
   (req, res) => controller.create(req, res)
 );

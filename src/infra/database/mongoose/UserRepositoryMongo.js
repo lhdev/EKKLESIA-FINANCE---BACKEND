@@ -28,6 +28,8 @@ function mapUser(user, { includePassword = false } = {}) {
     photoUrl: user.photoUrl || "",
     church: user.church,
     role: normalizeRole(user.role),
+    authVersion: user.authVersion || 0,
+    authEnabled: user.authEnabled !== false,
     permissions: normalizePermissions(user.permissions, user.role),
     profile,
   };
@@ -41,7 +43,7 @@ function mapUser(user, { includePassword = false } = {}) {
 
 class UserRepositoryMongo extends UserRepository {
   async findByEmail(email, withPassword = false) {
-    const query = UserSchema.findOne({ email: exactInsensitive(email) });
+    const query = UserSchema.findOne({ email: exactInsensitive(email.trim().toLowerCase()) });
     if (withPassword) {
       query.select("+password");
     }
@@ -52,7 +54,7 @@ class UserRepositoryMongo extends UserRepository {
 
   async findByEmailAndChurch(email, church, withPassword = false) {
     const query = UserSchema.findOne({
-      email: exactInsensitive(email),
+      email: exactInsensitive(email.trim().toLowerCase()),
       church: exactInsensitive(church),
     });
     if (withPassword) {
@@ -76,7 +78,7 @@ class UserRepositoryMongo extends UserRepository {
   }
 
   async update(id, data) {
-    const user = await UserSchema.findByIdAndUpdate(id, data, { new: true }).select("-password");
+    const user = await UserSchema.findByIdAndUpdate(id, data, { new: true, runValidators: true }).select("-password");
     return mapUser(user);
   }
 
@@ -87,6 +89,14 @@ class UserRepositoryMongo extends UserRepository {
   async findById(id) {
     const user = await UserSchema.findById(id).select("-password");
     return mapUser(user);
+  }
+
+  async createMany(data) {
+    // Atlas/replica set transaction: no partially persisted imports.
+    return UserSchema.db.transaction(async session => {
+      const users = await UserSchema.insertMany(data, { session, ordered: true });
+      return users.map(user => mapUser(user));
+    });
   }
 
   async create(data) {

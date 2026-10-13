@@ -24,7 +24,7 @@ class UserController {
   }
 
   async list(req, res) {
-    const users = await this.listUsersUseCase.execute(req.user.church, req.query);
+    const users = await this.listUsersUseCase.execute(req.user.church, req.query, req.user.role);
     return res.json(users);
   }
 

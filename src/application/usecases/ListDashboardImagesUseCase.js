@@ -3,8 +3,8 @@ class ListDashboardImagesUseCase {
     this.dashboardImageRepository = dashboardImageRepository;
   }
 
-  async execute() {
-    return this.dashboardImageRepository.findAll();
+  async execute(church) {
+    return this.dashboardImageRepository.findAll(church);
   }
 }
 

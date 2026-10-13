@@ -7,6 +7,7 @@ const GetMeUseCase = require("../../../application/usecases/GetMeUseCase");
 const AuthController = require("../controllers/AuthController");
 const authMiddleware = require("../middlewares/auth.middleware");
 
+const { authLimiter, accountLimiter } = require("../middlewares/rate-limit.middleware");
 const router = express.Router();
 
 const userRepo = new UserRepositoryMongo();
@@ -15,8 +16,8 @@ const loginUC = new LoginUserUseCase(userRepo);
 const getMeUC = new GetMeUseCase(userRepo);
 const controller = new AuthController(registerUC, loginUC, getMeUC);
 
-router.post("/register", (req, res) => controller.register(req, res));
-router.post("/login", (req, res) => controller.login(req, res));
+router.post("/register", authLimiter, accountLimiter, (req, res) => controller.register(req, res));
+router.post("/login", authLimiter, accountLimiter, (req, res) => controller.login(req, res));
 router.get("/me", authMiddleware, (req, res) => controller.me(req, res));
 
 module.exports = router;

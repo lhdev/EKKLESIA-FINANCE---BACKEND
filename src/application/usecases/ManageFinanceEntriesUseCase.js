@@ -1,4 +1,7 @@
+const CloudinaryMediaStorage = require('../../infra/providers/CloudinaryMediaStorage');
 const mongoose = require("mongoose");
+const input = require("../../shared/security/input");
+const { financeSummary } = require("../../shared/security/finance");
 const AppError = require("../../shared/errors/AppError");
 const {
   FinanceEntry,
@@ -45,6 +48,7 @@ function normalizeType(value) {
 }
 
 function normalizeCategory(value) {
+  if (value !== undefined && typeof value !== "string") throw new AppError("Categoria invalida", 400);
   const key = normalizeText(value);
   return CATEGORY_ALIASES[key] || Object.values(
     FINANCE_CONTRIBUTION_CATEGORIES
@@ -52,12 +56,14 @@ function normalizeCategory(value) {
 }
 
 function normalizeStatus(value) {
-  if (typeof value !== "string") return FINANCE_ENTRY_STATUSES.PENDING;
+  if (value === undefined) return FINANCE_ENTRY_STATUSES.PENDING;
+  if (typeof value !== "string") throw new AppError("Status financeiro invalido", 400);
   const normalized = normalizeText(value);
   if (normalized === "confirmado" || normalized === "confirmed") {
     return FINANCE_ENTRY_STATUSES.CONFIRMED;
   }
-  return FINANCE_ENTRY_STATUSES.PENDING;
+  if (normalized === 'pendente' || normalized === 'pending') return FINANCE_ENTRY_STATUSES.PENDING;
+  throw new AppError('Status financeiro invalido', 400);
 }
 
 function validateChurch(church) {
@@ -69,15 +75,19 @@ function validateChurch(church) {
 
 function validatePayload(data) {
   const type = normalizeType(data.type);
+  if (!['number', 'string'].includes(typeof data.amountCents) ||
+      (typeof data.amountCents === 'string' && !/^\d+$/.test(data.amountCents))) {
+    throw new AppError('Valor invalido', 400);
+  }
   const amountCents = Number(data.amountCents);
-  const occurredAt = data.occurredAt ? new Date(data.occurredAt) : new Date();
+  const occurredAt = data.occurredAt ? input.date(data.occurredAt) : new Date();
   const category = normalizeCategory(data.category) ||
     FINANCE_CONTRIBUTION_CATEGORIES.OTHER;
 
   if (!type) {
     throw new AppError("Tipo deve ser CONTRIBUICAO ou DESPESA", 400);
   }
-  if (!Number.isSafeInteger(amountCents) || amountCents <= 0) {
+  if (!Number.isSafeInteger(amountCents) || amountCents <= 0 || amountCents > 99999999900) {
     throw new AppError("Valor deve ser informado em centavos e ser maior que zero", 400);
   }
   if (Number.isNaN(occurredAt.getTime())) {
@@ -90,7 +100,7 @@ function validatePayload(data) {
     category,
     status: normalizeStatus(data.status),
     occurredAt,
-    description: typeof data.description === "string" ? data.description.trim() : "",
+    description: input.text(data.description ?? "", "Descricao", { max: 500 }),
     ...(data.receiptUrl !== undefined && {
       receiptUrl:
         typeof data.receiptUrl === "string" ? data.receiptUrl.trim() : "",
@@ -102,6 +112,8 @@ function validatePayload(data) {
         typeof data.receiptStorageId === "string"
           ? data.receiptStorageId.trim()
           : "",
+      receiptDeliveryType: data.receiptDeliveryType === "authenticated" ? "authenticated" : "upload",
+      receiptFormat: data.receiptFormat || "",
       receiptResourceType:
         typeof data.receiptResourceType === "string"
           ? data.receiptResourceType.trim()
@@ -110,7 +122,7 @@ function validatePayload(data) {
   };
 }
 
-function serialize(entry) {
+function serialize(entry, storage) {
   return {
     id: entry._id,
     type: entry.type,
@@ -119,7 +131,7 @@ function serialize(entry) {
     occurredAt: entry.occurredAt,
     category: entry.category,
     status: entry.status,
-    receiptUrl: entry.receiptUrl,
+    receiptUrl: storage?.receiptUrl(entry) || "",
     receiptFileName: entry.receiptFileName,
     createdBy: entry.createdBy?._id
       ? {
@@ -134,10 +146,14 @@ function serialize(entry) {
 }
 
 class ManageFinanceEntriesUseCase {
+  constructor(storage = new CloudinaryMediaStorage()) { this.storage = storage; }
   async list({ church, userId, role }) {
     const normalizedChurch = validateChurch(church);
-    const filter = { church: normalizedChurch };
+    const filter = { church: input.churchPattern(normalizedChurch) };
     const normalizedRole = normalizeRole(role);
+    if (![ROLES.ADMIN, ROLES.FINANCEIRO, ROLES.LIDER, ROLES.MEMBRO].includes(normalizedRole)) {
+      throw new AppError("Perfil sem acesso financeiro", 403);
+    }
     if (
       normalizedRole === ROLES.LIDER ||
       normalizedRole === ROLES.MEMBRO
@@ -151,26 +167,28 @@ class ManageFinanceEntriesUseCase {
     }
     const entries = await query.sort({ occurredAt: -1, createdAt: -1 }).lean();
 
-    const summary = entries.reduce(
-      (totals, entry) => {
-        if (entry.type === FINANCE_ENTRY_TYPES.CONTRIBUTION) {
-          totals.contributionsCents += entry.amountCents;
-          totals.balanceCents += entry.amountCents;
-        } else {
-          totals.expensesCents += entry.amountCents;
-          totals.balanceCents -= entry.amountCents;
-        }
-        return totals;
-      },
-      { contributionsCents: 0, expensesCents: 0, balanceCents: 0 }
-    );
+    const summary = financeSummary(entries);
 
-    return { entries: entries.map(serialize), summary };
+    return { entries: entries.map(entry => serialize(entry, this.storage)), summary };
   }
 
   async create({ church, userId, role, data }) {
     const normalizedChurch = validateChurch(church);
+    const normalizedRole = normalizeRole(role);
+    if (![ROLES.ADMIN, ROLES.FINANCEIRO, ROLES.LIDER, ROLES.MEMBRO].includes(normalizedRole)) {
+      throw new AppError('Perfil sem acesso financeiro', 403);
+    }
     const payload = validatePayload(data);
+    if (![ROLES.ADMIN, ROLES.FINANCEIRO].includes(normalizedRole)) {
+      if (payload.status === FINANCE_ENTRY_STATUSES.CONFIRMED) {
+        throw new AppError('Somente admin ou financeiro pode confirmar', 403);
+      }
+      payload.status = FINANCE_ENTRY_STATUSES.PENDING;
+    }
+    if (payload.status === FINANCE_ENTRY_STATUSES.CONFIRMED) {
+      payload.confirmedBy = userId;
+      payload.confirmedAt = new Date();
+    }
     if (
       normalizeRole(role) === ROLES.MEMBRO &&
       payload.type !== FINANCE_ENTRY_TYPES.CONTRIBUTION
@@ -191,11 +209,11 @@ class ManageFinanceEntriesUseCase {
       church: normalizedChurch,
       createdBy: userId,
     });
-    return serialize(entry);
+    return serialize(entry, this.storage);
   }
 
   async update({ id, church, userId, role, data }) {
-    if (normalizeRole(role) === ROLES.MEMBRO) {
+    if (![ROLES.ADMIN, ROLES.FINANCEIRO, ROLES.LIDER].includes(normalizeRole(role))) {
       throw new AppError("Membro nao pode alterar lancamentos", 403);
     }
     if (!mongoose.isValidObjectId(id)) {
@@ -203,27 +221,43 @@ class ManageFinanceEntriesUseCase {
     }
     const normalizedChurch = validateChurch(church);
     const payload = validatePayload(data);
-    const filter = { _id: id, church: normalizedChurch };
-    if (normalizeRole(role) === ROLES.LIDER) filter.createdBy = userId;
+    for (const field of ['receiptUrl', 'receiptFileName', 'receiptStorageId', 'receiptResourceType', 'receiptDeliveryType', 'receiptFormat']) delete payload[field];
+    const filter = { _id: id, church: input.churchPattern(normalizedChurch) };
+    if (normalizeRole(role) === ROLES.LIDER) {
+      if (payload.status === FINANCE_ENTRY_STATUSES.CONFIRMED) {
+        throw new AppError('Somente admin ou financeiro pode confirmar', 403);
+      }
+      filter.createdBy = userId;
+      filter.status = FINANCE_ENTRY_STATUSES.PENDING;
+    }
+    if (data.status === undefined) delete payload.status;
+    else {
+      payload.confirmedBy = payload.status === FINANCE_ENTRY_STATUSES.CONFIRMED ? userId : null;
+      payload.confirmedAt = payload.status === FINANCE_ENTRY_STATUSES.CONFIRMED ? new Date() : null;
+    }
+    payload.updatedBy = userId;
     const entry = await FinanceEntry.findOneAndUpdate(
       filter,
       payload,
       { new: true, runValidators: true }
     );
     if (!entry) throw new AppError("Lancamento nao encontrado", 404);
-    return serialize(entry);
+    return serialize(entry, this.storage);
   }
 
   async delete({ id, church, userId, role }) {
-    if (normalizeRole(role) === ROLES.MEMBRO) {
+    if (![ROLES.ADMIN, ROLES.FINANCEIRO, ROLES.LIDER].includes(normalizeRole(role))) {
       throw new AppError("Membro nao pode excluir lancamentos", 403);
     }
     if (!mongoose.isValidObjectId(id)) {
       throw new AppError("Lancamento nao encontrado", 404);
     }
     const normalizedChurch = validateChurch(church);
-    const filter = { _id: id, church: normalizedChurch };
-    if (normalizeRole(role) === ROLES.LIDER) filter.createdBy = userId;
+    const filter = { _id: id, church: input.churchPattern(normalizedChurch) };
+    if (normalizeRole(role) === ROLES.LIDER) {
+      filter.createdBy = userId;
+      filter.status = FINANCE_ENTRY_STATUSES.PENDING;
+    }
     const entry = await FinanceEntry.findOneAndDelete(filter);
     if (!entry) throw new AppError("Lancamento nao encontrado", 404);
   }

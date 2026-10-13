@@ -1,4 +1,5 @@
 const bcrypt = require("bcryptjs");
+const input = require('../../shared/security/input');
 const AppError = require("../../shared/errors/AppError");
 const { ROLES, normalizeRole } = require("../../shared/config/roles");
 const {
@@ -40,7 +41,7 @@ class UpdateUserUseCase {
   async execute({ id, requesterId, requesterRole, requesterChurch, data }) {
     const normalizedRequesterRole = normalizeRole(requesterRole);
     const isAdmin = normalizedRequesterRole === ROLES.ADMIN;
-    const isOwner = id === requesterId;
+    const isOwner = String(id) === String(requesterId);
 
     if (!isAdmin && !isOwner) {
       throw new AppError("Sem permissao", 403);
@@ -61,7 +62,7 @@ class UpdateUserUseCase {
       if (!String(requestedName).trim()) {
         throw new AppError("Nome completo e obrigatorio", 400);
       }
-      updateData.name = String(requestedName).trim();
+      updateData.name = input.text(requestedName, 'Nome', { min: 1, max: 150 });
     }
 
     const requestedPhone = firstDefined(data.phone, data.telefone1);
@@ -70,7 +71,7 @@ class UpdateUserUseCase {
     }
 
     if (isAdmin && data.email !== undefined) {
-      const normalizedEmail = String(data.email).trim().toLowerCase();
+      const normalizedEmail = input.email(data.email);
       if (!normalizedEmail) {
         throw new AppError("Email e obrigatorio", 400);
       }
@@ -86,16 +87,20 @@ class UpdateUserUseCase {
 
     const requestedBirthDate = firstDefined(data.birthDate, data.dataNascimento);
     if (requestedBirthDate !== undefined) {
-      updateData.birthDate = requestedBirthDate || null;
+      updateData.birthDate = input.date(requestedBirthDate, { nullable: true });
     }
 
     const requestedPhoto = firstDefined(data.photoUrl, data.fotoUrl);
     if (requestedPhoto !== undefined) {
-      updateData.photoUrl = String(requestedPhoto).trim();
+      updateData.photoUrl = input.photo(requestedPhoto);
     }
 
-    if (isAdmin && data.status !== undefined) updateData.status = data.status;
-    if (isAdmin && data.isLeader !== undefined) updateData.isLeader = data.isLeader;
+    if (isAdmin && data.status !== undefined) updateData.status = input.status(data.status);
+    if (data.authEnabled !== undefined) {
+      if (!isAdmin) throw new AppError("Somente admin pode alterar acesso", 403);
+      updateData.authEnabled = input.boolean(data.authEnabled, "Acesso");
+    }
+    if (isAdmin && data.isLeader !== undefined) updateData.isLeader = input.boolean(data.isLeader, "Lider");
 
     const incomingProfile = plainObject(data.profile);
     const existingProfile = plainObject(existingUser.profile);
@@ -149,7 +154,7 @@ class UpdateUserUseCase {
     }
 
     if (data.role) {
-      updateData.role = normalizeRole(data.role);
+      updateData.role = input.role(data.role);
     }
 
     if (data.permissions !== undefined) {
@@ -169,14 +174,18 @@ class UpdateUserUseCase {
     }
 
     if (data.password !== undefined) {
-      if (
-        typeof data.password !== "string" ||
-        data.password.length < 4
-      ) {
-        throw new AppError("A senha deve ter pelo menos 4 caracteres", 400);
+      input.password(data.password);
+      if (isOwner) {
+        const credentials = await this.userRepository.findByEmail(existingUser.email, true);
+        if (typeof data.currentPassword !== 'string' || !credentials?.password ||
+            !await bcrypt.compare(data.currentPassword, credentials.password)) {
+          throw new AppError('Informe a senha atual para alterar sua senha', 403);
+        }
       }
-
-      updateData.password = await bcrypt.hash(data.password, 8);
+      updateData.password = await bcrypt.hash(data.password, 12);
+    }
+    if (['password', 'role', 'permissions', 'authEnabled'].some(key => updateData[key] !== undefined)) {
+      updateData.$inc = { authVersion: 1 };
     }
 
     return this.userRepository.update(id, updateData);

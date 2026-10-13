@@ -1,21 +1,26 @@
 const bcrypt = require("bcryptjs");
+const input = require('../../shared/security/input');
 const jwt = require("jsonwebtoken");
 const AppError = require("../../shared/errors/AppError");
 const { normalizePermissions } = require("../../shared/config/permissions");
 const { normalizeRole } = require("../../shared/config/roles");
-const { validateChurch } = require("../../shared/config/churches");
+const { churchPolicy: defaultChurchPolicy } = require("../../shared/config/churches");
 
 class LoginUserUseCase {
-  constructor(userRepository) {
+  constructor(userRepository, churchPolicy = defaultChurchPolicy) {
     this.userRepository = userRepository;
+    this.churchPolicy = churchPolicy;
   }
 
   async execute({ email, password, church }) {
-    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedEmail = input.email(email);
+    if (typeof password !== 'string' || !password || Buffer.byteLength(password) > 72) {
+      throw new AppError('Credenciais invalidas', 401);
+    }
     // Clientes legados podem omitir a igreja; nesse caso, validamos a da conta.
     const normalizedChurch = church === undefined
       ? undefined
-      : validateChurch(church);
+      : this.churchPolicy.validateChurch(church);
 
     let user = null;
 
@@ -44,12 +49,15 @@ class LoginUserUseCase {
       throw new AppError("Credenciais invalidas", 401);
     }
 
+    if (user.authEnabled === false || typeof user.password !== 'string') {
+      throw new AppError('Credenciais invalidas', 401);
+    }
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) {
       throw new AppError("Credenciais invalidas", 401);
     }
 
-    validateChurch(user.church || normalizedChurch);
+    this.churchPolicy.validateChurch(user.church || normalizedChurch);
 
     // Contas criadas antes da obrigatoriedade de igreja sao vinculadas
     // com seguranca somente depois da senha ter sido validada.
@@ -62,9 +70,9 @@ class LoginUserUseCase {
     const permissions = normalizePermissions(user.permissions, role);
 
     const token = jwt.sign(
-      { id: user.id, church: user.church, role, permissions },
+      { id: user.id, church: user.church, authVersion: user.authVersion || 0 },
       process.env.JWT_SECRET,
-      { expiresIn: "1d" }
+      { expiresIn: "1d", algorithm: "HS256" }
     );
 
     return {

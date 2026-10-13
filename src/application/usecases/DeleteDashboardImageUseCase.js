@@ -5,8 +5,8 @@ class DeleteDashboardImageUseCase {
     this.dashboardImageRepository = dashboardImageRepository;
   }
 
-  async execute(id) {
-    const deletedImage = await this.dashboardImageRepository.delete(id);
+  async execute(id, church) {
+    const deletedImage = await this.dashboardImageRepository.delete(id, church);
 
     if (!deletedImage) {
       throw new AppError('Imagem nao encontrada', 404);
