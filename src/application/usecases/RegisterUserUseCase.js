@@ -2,18 +2,19 @@ const bcrypt = require("bcryptjs");
 const input = require('../../shared/security/input');
 const AppError = require("../../shared/errors/AppError");
 const { ROLES } = require("../../shared/config/roles");
-const { validateChurch } = require("../../shared/config/churches");
+const { churchPolicy: defaultChurchPolicy } = require("../../shared/config/churches");
 
 class RegisterUserUseCase {
-  constructor(userRepository) {
+  constructor(userRepository, churchPolicy = defaultChurchPolicy) {
     this.userRepository = userRepository;
+    this.churchPolicy = churchPolicy;
   }
 
   async execute({ name, email, church, password }) {
     const normalizedEmail = input.email(email);
     name = input.text(name, 'Nome', { min: 1, max: 150 });
     input.password(password);
-    const normalizedChurch = validateChurch(church);
+    const normalizedChurch = this.churchPolicy.validateChurch(church);
 
     const userExists = normalizedChurch
       ? await this.userRepository.findByEmailAndChurch(normalizedEmail, normalizedChurch)

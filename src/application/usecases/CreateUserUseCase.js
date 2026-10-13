@@ -3,15 +3,16 @@ const input = require('../../shared/security/input');
 const crypto = require("node:crypto");
 const AppError = require("../../shared/errors/AppError");
 const { normalizeRole } = require("../../shared/config/roles");
-const { validateChurch } = require("../../shared/config/churches");
+const { churchPolicy: defaultChurchPolicy } = require("../../shared/config/churches");
 const {
   hasOnlyAllowedPermissions,
   normalizePermissions,
 } = require("../../shared/config/permissions");
 
 class CreateUserUseCase {
-  constructor(userRepository) {
+  constructor(userRepository, churchPolicy = defaultChurchPolicy) {
     this.userRepository = userRepository;
+    this.churchPolicy = churchPolicy;
   }
 
   async execute(data) {
@@ -45,7 +46,7 @@ class CreateUserUseCase {
     input.text(name, 'Nome', { min: 1, max: 150 });
     input.password(password);
     const normalizedEmail = input.email(email);
-    const normalizedChurch = validateChurch(church);
+    const normalizedChurch = this.churchPolicy.validateChurch(church);
     const normalizedRole = input.role(role);
 
     const exists = normalizedChurch

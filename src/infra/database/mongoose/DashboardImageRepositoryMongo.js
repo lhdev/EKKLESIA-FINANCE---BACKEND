@@ -1,7 +1,8 @@
 const { validateChurch } = require('../../../shared/config/churches');
+const { churchPattern } = require('../../../shared/security/input');
 function churchFilter(church) {
   const normalized = validateChurch(church);
-  const scoped = { church: new RegExp(`^${normalized}$`, 'i') };
+  const scoped = { church: churchPattern(normalized) };
   // Legacy unscoped gallery belongs exclusively to the original ADPV tenant.
   return normalized.toLowerCase() === 'adpv' ? { $or: [scoped, { church: { $exists: false } }] } : scoped;
 }

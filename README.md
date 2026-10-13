@@ -20,3 +20,20 @@ Leia o [guia passo a passo para Atlas Free](GUIA_DEPLOY_SEM_PERDA.md) e
 `GET /health` verifica o processo; `GET /ready` exige conexão MongoDB ativa.
 Não executar seed em build/start. Importação transacional exige Atlas/replica set.
 O frontend está em um repositório separado.
+
+## Igrejas autorizadas
+
+Para autorizar outra igreja, adicione seu nome em `ALLOWED_CHURCHES`, no arquivo
+`src/shared/config/churches.js`, e execute `npm test`. Adpv e Rosa de Saron já estão
+habilitadas. A configuração é compartilhada por cadastro, login, autenticação,
+seed de administrador e galeria; os testes percorrem as igrejas configuradas.
+
+A regra de autorização fica em `src/domain/services/ChurchPolicy.js`, separada
+da lista de igrejas e sem dependência de banco ou HTTP. Os casos de uso de cadastro,
+login e criação de imagens aceitam uma política no segundo argumento do construtor
+com o método `validateChurch(church, statusCode)`, mantendo a política padrão para
+os consumidores existentes. Novas igrejas não exigem alterações nesses casos de uso.
+
+A validação ignora caixa e espaços externos, preservando a grafia informada para
+compatibilidade com dados existentes. As consultas continuam limitadas à igreja
+do usuário. Imagens legadas sem igreja pertencem exclusivamente à Adpv.
