@@ -13,6 +13,13 @@ const { env } = require('./shared/config/env');
 
 const app = express();
 
+function isAllowedLocalOrigin(origin) {
+  if (!env.corsAllowLocalhost) return false;
+  // Flutter web assigns a new port on each run. Only literal loopback
+  // origins are eligible; LAN hosts and localhost subdomains stay blocked.
+  return /^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::\d{1,5})?$/.test(origin);
+}
+
 function buildCorsOptions() {
   if (env.corsOrigins.includes('*')) {
     return {
@@ -24,7 +31,7 @@ function buildCorsOptions() {
 
   return {
     origin(origin, callback) {
-      if (!origin || env.corsOrigins.includes(origin)) {
+      if (!origin || env.corsOrigins.includes(origin) || isAllowedLocalOrigin(origin)) {
         callback(null, true);
         return;
       }

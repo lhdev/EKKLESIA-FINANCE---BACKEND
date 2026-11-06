@@ -47,6 +47,7 @@ const env = {
   mongoUri: process.env.MONGO_URI?.trim() || '',
   jwtSecret: process.env.JWT_SECRET?.trim() || '',
   corsOrigins: parseCorsOrigins(process.env.CORS_ORIGINS),
+  corsAllowLocalhost: process.env.CORS_ALLOW_LOCALHOST?.trim().toLowerCase() === 'true',
   trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
   jsonBodyLimit: process.env.JSON_BODY_LIMIT?.trim() || '1mb',
   cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME?.trim() || '',

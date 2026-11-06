@@ -30,6 +30,7 @@ branch de correções não atualiza o serviço vinculado à `main`.
 | HOST | `0.0.0.0` |
 | PORT | Porta fornecida pelo Render |
 | CORS_ORIGINS | Origens reais do frontend separadas por vírgula, sem caminho/barra final; sem `*` |
+| CORS_ALLOW_LOCALHOST | `true` para permitir Flutter web em `localhost`, `127.0.0.1` e `[::1]` com portas dinâmicas; desativado por padrão |
 | PUBLIC_API_URL | URL HTTPS do respectivo serviço; ausente, usa RENDER_EXTERNAL_URL |
 | TRUST_PROXY | Proxies realmente confiáveis; aceita configuração Express ou número de saltos. Validar IPs/rate limit em homologação; não usar true nem assumir a quantidade. |
 | MONGO_URI/JWT_SECRET/CLOUDINARY_* | Novos segredos exclusivamente no Environment do respectivo serviço |
@@ -39,6 +40,32 @@ Configuração ausente, JWT curto, CORS wildcard ou URL pública HTTP impede a i
 Conferir as configurações antes do merge. O teste local não valida os provedores reais.
 
 ## Aceite em homologação
+
+### Login local bloqueado por CORS
+
+Se `OPTIONS /auth/login` responder `403` com `Origem nao permitida`, a origem
+do navegador não está autorizada. O navegador bloqueia o POST antes de validar
+email e senha.
+
+No **Environment** do serviço Render, mantenha as origens publicadas em
+`CORS_ORIGINS` e adicione `CORS_ALLOW_LOCALHOST=true` para testar o Flutter web
+localmente. Publique a versão com essa opção e aplique as variáveis ao serviço.
+A opção permite apenas hosts de loopback literais; não libera sites externos.
+
+Como alternativa sem habilitar portas dinâmicas, acrescente
+`http://localhost:8080` a `CORS_ORIGINS` (preservando as origens existentes) e rode
+`flutter run -d chrome --web-hostname=localhost --web-port=8080`.
+Esta alternativa também funciona no backend anterior, sem mudança de código.
+Não use a URL da API como origem do frontend nem inclua `/#/login` no valor.
+
+Após aplicar a configuração, confirme que o preflight retorna `204` e
+`Access-Control-Allow-Origin` igual à origem enviada:
+
+```sh
+curl -i -X OPTIONS https://ekklesia-finance-backend.onrender.com/auth/login -H "Origin: http://localhost:52220" -H "Access-Control-Request-Method: POST" -H "Access-Control-Request-Headers: content-type"
+```
+
+### Fluxos da aplicação
 
 - Login, sessão, `/health` e `/ready` com o frontend corrigido, para todos os perfis.
 - Status cadastrais não suspendem acesso. Suspensão usa `authEnabled: false`, exclusivo

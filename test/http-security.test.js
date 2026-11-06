@@ -8,6 +8,7 @@ process.env.CORS_ORIGINS = 'https://frontend.example.com';
 process.env.NODE_ENV = 'test';
 const User = require('../src/infra/database/mongoose/schemas/UserSchema');
 const app = require('../src/app');
+const { env } = require('../src/shared/config/env');
 const server = app.listen(0, '127.0.0.1');
 const ready = new Promise(resolve => server.once('listening', resolve));
 test.after(() => new Promise(resolve => server.close(resolve)));
@@ -26,6 +27,36 @@ test('health, readiness and security headers do not need database writes', async
 test('CORS permits configured frontend and rejects other origins', async () => {
   assert.equal((await request('/health', { headers: { Origin: 'https://frontend.example.com' } })).headers.get('access-control-allow-origin'), 'https://frontend.example.com');
   assert.equal((await request('/health', { headers: { Origin: 'https://evil.example.com' } })).status, 403);
+});
+
+test('login preflight permits Flutter loopback ports only when explicitly enabled', async t => {
+  const previous = env.corsAllowLocalhost;
+  t.after(() => { env.corsAllowLocalhost = previous; });
+  const preflight = origin => request('/auth/login', {
+    method: 'OPTIONS',
+    headers: {
+      Origin: origin,
+      'Access-Control-Request-Method': 'POST',
+      'Access-Control-Request-Headers': 'content-type,authorization',
+    },
+  });
+
+  env.corsAllowLocalhost = false;
+  assert.equal((await preflight('http://localhost:52220')).status, 403);
+  env.corsAllowLocalhost = true;
+  for (const origin of ['http://localhost:52220', 'http://localhost:8080', 'http://127.0.0.1:61000', 'http://[::1]:8080']) {
+    const response = await preflight(origin);
+    assert.equal(response.status, 204);
+    assert.equal(response.headers.get('access-control-allow-origin'), origin);
+    assert.match(response.headers.get('access-control-allow-methods'), /POST/);
+    assert.match(response.headers.get('access-control-allow-headers'), /content-type/);
+    assert.match(response.headers.get('access-control-allow-headers'), /authorization/);
+  }
+  for (const origin of ['https://evil.example.com', 'http://localhost.evil.example.com:52220', 'http://192.168.0.1:52220', 'http://localhost:52220@evil.example.com', 'null']) {
+    const response = await preflight(origin);
+    assert.equal(response.status, 403);
+    assert.equal(response.headers.get('access-control-allow-origin'), null);
+  }
 });
 test('malformed JSON and database errors hide internal details', async t => {
   let response = await request('/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{broken' });
